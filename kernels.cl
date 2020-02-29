@@ -74,20 +74,20 @@ kernel void rebound(global t_speed* cells,
                       global int* obstacles,
                       int nx, int ny)
 {
-    // /* get column and row indices */
-    // int ii = get_global_id(0);
-    // int jj = get_global_id(1);
-    // if (obstacles[jj*nx + ii])
-    // {
-    //   /* called after propagate, so taking values from scratch space
-    //   ** mirroring, and writing into main grid */
-    //   cells[ii + jj*nx].speeds[1] = tmp_cells[ii + jj*nx].speeds[3];
-    //   cells[ii + jj*nx].speeds[2] = tmp_cells[ii + jj*nx].speeds[4];
-    //   cells[ii + jj*nx].speeds[3] = tmp_cells[ii + jj*nx].speeds[1];
-    //   cells[ii + jj*nx].speeds[4] = tmp_cells[ii + jj*nx].speeds[2];
-    //   cells[ii + jj*nx].speeds[5] = tmp_cells[ii + jj*nx].speeds[7];
-    //   cells[ii + jj*nx].speeds[6] = tmp_cells[ii + jj*nx].speeds[8];
-    //   cells[ii + jj*nx].speeds[7] = tmp_cells[ii + jj*nx].speeds[5];
-    //   cells[ii + jj*nx].speeds[8] = tmp_cells[ii + jj*nx].speeds[6];
-    // }
+    /* get column and row indices */
+    int ii = get_global_id(0);
+    int jj = get_global_id(1);
+    if (obstacles[jj*nx + ii])
+    {
+      /* called after propagate, so taking values from scratch space
+      ** mirroring, and writing into main grid */
+      cells[ii + jj*nx].speeds[1] = tmp_cells[ii + jj*nx].speeds[3];
+      cells[ii + jj*nx].speeds[2] = tmp_cells[ii + jj*nx].speeds[4];
+      cells[ii + jj*nx].speeds[3] = tmp_cells[ii + jj*nx].speeds[1];
+      cells[ii + jj*nx].speeds[4] = tmp_cells[ii + jj*nx].speeds[2];
+      cells[ii + jj*nx].speeds[5] = tmp_cells[ii + jj*nx].speeds[7];
+      cells[ii + jj*nx].speeds[6] = tmp_cells[ii + jj*nx].speeds[8];
+      cells[ii + jj*nx].speeds[7] = tmp_cells[ii + jj*nx].speeds[5];
+      cells[ii + jj*nx].speeds[8] = tmp_cells[ii + jj*nx].speeds[6];
+    }
 }
