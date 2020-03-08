@@ -77,19 +77,20 @@ kernel void rebound(global t_speed* cells,
     /* get column and row indices */
     int ii = get_global_id(0);
     int jj = get_global_id(1);
-    if (obstacles[jj*nx + ii])
-    {
-      /* called after propagate, so taking values from scratch space
-      ** mirroring, and writing into main grid */
-      cells[ii + jj*nx].speeds[1] = tmp_cells[ii + jj*nx].speeds[3];
-      cells[ii + jj*nx].speeds[2] = tmp_cells[ii + jj*nx].speeds[4];
-      cells[ii + jj*nx].speeds[3] = tmp_cells[ii + jj*nx].speeds[1];
-      cells[ii + jj*nx].speeds[4] = tmp_cells[ii + jj*nx].speeds[2];
-      cells[ii + jj*nx].speeds[5] = tmp_cells[ii + jj*nx].speeds[7];
-      cells[ii + jj*nx].speeds[6] = tmp_cells[ii + jj*nx].speeds[8];
-      cells[ii + jj*nx].speeds[7] = tmp_cells[ii + jj*nx].speeds[5];
-      cells[ii + jj*nx].speeds[8] = tmp_cells[ii + jj*nx].speeds[6];
-    }
+    int index = ii + jj*params.nx;
+    if (obstacles[jj*params.nx + ii])
+     {
+       /* called after propagate, so taking values from scratch space
+       ** mirroring, and writing into main grid */
+       cells->speedsE[index] = tmp_cells->speedsW[index];
+       cells->speedsN[index] = tmp_cells->speedsS[index];
+       cells->speedsW[index] = tmp_cells->speedsE[index];
+       cells->speedsS[index] = tmp_cells->speedsN[index];
+       cells->speedsNE[index] = tmp_cells->speedsSW[index];
+       cells->speedsNW[index] = tmp_cells->speedsSE[index];
+       cells->speedsSW[index] = tmp_cells->speedsNE[index];
+       cells->speedsSE[index] = tmp_cells->speedsNW[index];
+     }
 }
 
 kernel void collision(global t_speed* cells,
