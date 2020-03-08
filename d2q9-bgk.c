@@ -139,7 +139,7 @@ int collision(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obs
 int write_values(const t_param params, t_speed* cells, int* obstacles, float* av_vels);
 
 /* finalise, including freeing up allocated memory */
-int finalise(const t_param* params, t_speed** cells_ptr, t_speed** tmp_cells_ptr,
+int finalise(const t_param* params, t_speed_arr** cells_ptr, t_speed_arr** tmp_cells_ptr,
              int** obstacles_ptr, float** av_vels_ptr, t_ocl ocl);
 
 /* Sum all the densities in the grid.
@@ -756,7 +756,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
     ocl->context, CL_MEM_READ_WRITE,
     sizeof(t_speed_arr*) * params->nx * params->ny, NULL, &err);
   checkError(err, "creating tmp_cells buffer", __LINE__);
-  
+
   ocl->obstacles = clCreateBuffer(
     ocl->context, CL_MEM_READ_WRITE,
     sizeof(cl_int) * params->nx * params->ny, NULL, &err);
@@ -796,7 +796,7 @@ int finalise(const t_param* params, t_speed** cells_ptr, t_speed** tmp_cells_ptr
 }
 
 
-float calc_reynolds(const t_param params, t_speed* cells, int* obstacles, t_ocl ocl)
+float calc_reynolds(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl)
 {
   const float viscosity = 1.f / 6.f * (2.f / params.omega - 1.f);
 
@@ -813,7 +813,16 @@ float total_density(const t_param params, t_speed* cells)
     {
       for (int kk = 0; kk < NSPEEDS; kk++)
       {
-        total += cells[ii + jj*params.nx].speeds[kk];
+          int index = ii+jj*params.nx;
+          total += cells->speeds0[index];
+          total += cells->speedsN[index];
+          total += cells->speedsS[index];
+          total += cells->speedsW[index];
+          total += cells->speedsE[index];
+          total += cells->speedsNW[index];
+          total += cells->speedsNE[index];
+          total += cells->speedsSW[index];
+          total += cells->speedsSE[index];
       }
     }
   }
@@ -821,7 +830,7 @@ float total_density(const t_param params, t_speed* cells)
   return total;
 }
 
-int write_values(const t_param params, t_speed* cells, int* obstacles, float* av_vels)
+int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels)
 {
   FILE* fp;                     /* file pointer */
   const float c_sq = 1.f / 3.f; /* sq. of speed of sound */
@@ -851,33 +860,38 @@ int write_values(const t_param params, t_speed* cells, int* obstacles, float* av
       /* no obstacle */
       else
       {
-        local_density = 0.f;
+          local_density = 0.f;
 
-        for (int kk = 0; kk < NSPEEDS; kk++)
-        {
-          local_density += cells[ii + jj*params.nx].speeds[kk];
-        }
-
-        /* compute x velocity component */
-        u_x = (cells[ii + jj*params.nx].speeds[1]
-               + cells[ii + jj*params.nx].speeds[5]
-               + cells[ii + jj*params.nx].speeds[8]
-               - (cells[ii + jj*params.nx].speeds[3]
-                  + cells[ii + jj*params.nx].speeds[6]
-                  + cells[ii + jj*params.nx].speeds[7]))
-              / local_density;
-        /* compute y velocity component */
-        u_y = (cells[ii + jj*params.nx].speeds[2]
-               + cells[ii + jj*params.nx].speeds[5]
-               + cells[ii + jj*params.nx].speeds[6]
-               - (cells[ii + jj*params.nx].speeds[4]
-                  + cells[ii + jj*params.nx].speeds[7]
-                  + cells[ii + jj*params.nx].speeds[8]))
-              / local_density;
-        /* compute norm of velocity */
-        u = sqrtf((u_x * u_x) + (u_y * u_y));
-        /* compute pressure */
-        pressure = local_density * c_sq;
+          int index = ii + jj*params.nx;
+          local_density += cells->speeds0[index];
+          local_density += cells->speedsN[index];
+          local_density += cells->speedsS[index];
+          local_density += cells->speedsW[index];
+          local_density += cells->speedsE[index];
+          local_density += cells->speedsNW[index];
+          local_density += cells->speedsNE[index];
+          local_density += cells->speedsSW[index];
+          local_density += cells->speedsSE[index];
+          /* compute x velocity component */
+          float u_x = (cells->speedsE[index]
+                        + cells->speedsNE[index]
+                        + cells->speedsSE[index]
+                        - (cells->speedsW[index]
+                           + cells->speedsNW[index]
+                           + cells->speedsSW[index])  )
+                       / local_density;
+          /* compute y velocity component */
+          float u_y = (cells->speedsN[index]
+                        + cells->speedsNE[index]
+                        + cells->speedsNW[index]
+                        - (cells->speedsS[index]
+                           + cells->speedsSW[index]
+                           + cells->speedsSE[index]) )
+                       / local_density;
+          /* compute norm of velocity */
+          u = sqrtf((u_x * u_x) + (u_y * u_y));
+          /* compute pressure */
+          pressure = local_density * c_sq;
       }
 
       /* write to file */
