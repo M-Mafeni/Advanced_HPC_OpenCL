@@ -373,9 +373,14 @@ float av_velocity(const t_param params, t_speed* cells, int* obstacles, t_ocl oc
 {
 
   cl_int err;
-  int* cell_sums = malloc(sizeof(int) * params.nx * params.ny);
 
-  float* totu_sums = malloc(sizeof(float) * params.nx * params.ny);
+  size_t global[2] = {params.nx, params.ny};
+  size_t local[2] = {16, 16};
+
+  int* cell_sums = malloc(sizeof(int) * (params.nx/local[0]) * (params.ny/local[1]));
+  // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
+
+  float* totu_sums = malloc(sizeof(float) * (params.nx/local[0]) * (params.ny/local[1]));
 
   // Write cells to device
   err = clEnqueueWriteBuffer(
@@ -383,17 +388,13 @@ float av_velocity(const t_param params, t_speed* cells, int* obstacles, t_ocl oc
     sizeof(t_speed) * params.nx * params.ny, cells, 0, NULL, NULL);
   checkError(err, "writing cells data in av_velocity", __LINE__);
 
-  // Write cell_sums to device
-  err = clEnqueueWriteBuffer(
-    ocl.queue, ocl.cell_sums, CL_TRUE, 0,
-    sizeof(cl_int) * params.nx * params.ny, cell_sums, 0, NULL, NULL);
-  checkError(err, "writing cell_sums data in av_velocity", __LINE__);
+ cl_mem d_cell_sums = clCreateBuffer(
+  ocl.context, CL_MEM_WRITE_ONLY,
+  sizeof(cl_int) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
 
-  // Write totu_sums to device
-  err = clEnqueueWriteBuffer(
-    ocl.queue, ocl.totu_sums, CL_TRUE, 0,
-    sizeof(cl_float) * params.nx * params.ny, totu_sums, 0, NULL, NULL);
-  checkError(err, "writing totu_sums data in av_velocity", __LINE__);
+  cl_mem d_totu_sums = clCreateBuffer(
+    ocl.context, CL_MEM_WRITE_ONLY,
+    sizeof(cl_float) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
 
   //set kernel arguments
   err = clSetKernelArg(ocl.av_velocity, 0, sizeof(cl_mem), &ocl.cells);
@@ -403,37 +404,40 @@ float av_velocity(const t_param params, t_speed* cells, int* obstacles, t_ocl oc
   err = clSetKernelArg(ocl.av_velocity, 2, sizeof(cl_int), &params.nx);
   checkError(err, "setting av_velocity arg 2", __LINE__);
   // CHANGE LOCAL SIZES LATER
-  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(float) * 3 , NULL);
+  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(cl_int) * local[0] * local[1], NULL);
   checkError(err, "setting av_velocity arg 3", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(float) * 3 , NULL);
+  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(cl_float) * local[0] * local[1] , NULL);
   checkError(err, "setting av_velocity arg 4", __LINE__);
 
-  err = clSetKernelArg(ocl.av_velocity, 5, sizeof(cl_mem) , &ocl.cell_sums);
+  err = clSetKernelArg(ocl.av_velocity, 5, sizeof(cl_mem) , &d_cell_sums);
   checkError(err, "setting av_velocity arg 5", __LINE__);
 
-  err = clSetKernelArg(ocl.av_velocity, 6, sizeof(cl_mem) , &ocl.totu_sums);
+  err = clSetKernelArg(ocl.av_velocity, 6, sizeof(cl_mem) , &d_totu_sums);
   checkError(err, "setting av_velocity arg 6", __LINE__);
 
+  err = clSetKernelArg(ocl.av_velocity, 7, sizeof(cl_int) , &local[0]);
+  checkError(err, "setting av_velocity arg 7", __LINE__);
+
   //enqueue kernel
-  size_t global[2] = {params.nx, params.ny};
   err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity,
-                               2, NULL, global, NULL, 0, NULL, NULL);
+                               2, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing av_velocity kernel", __LINE__);
 
   // Wait for kernel to finish
   err = clFinish(ocl.queue);
   checkError(err, "waiting for av_velocity kernel", __LINE__);
 
-  //read back cell_sums and totu_sums
+  // read back cell_sums and totu_sums
   err = clEnqueueReadBuffer(
-    ocl.queue, ocl.cell_sums, CL_TRUE, 0,
-    sizeof(cl_int) * params.nx * params.ny, cell_sums, 0, NULL, NULL);
+    ocl.queue, d_cell_sums, CL_TRUE, 0,
+    sizeof(cl_int) * (params.nx/local[0]) * (params.ny/local[1]), cell_sums, 0, NULL, NULL);
   checkError(err, "reading cell_sums data in av_velocity", __LINE__);
 
   err = clEnqueueReadBuffer(
-    ocl.queue, ocl.totu_sums, CL_TRUE, 0,
-    sizeof(cl_float) * params.nx * params.ny, totu_sums, 0, NULL, NULL);
+    ocl.queue, d_totu_sums, CL_TRUE, 0,
+    sizeof(cl_float) * (params.nx/local[0]) * (params.ny/local[1]), totu_sums, 0, NULL, NULL);
   checkError(err, "reading totu_sums data in av_velocity", __LINE__);
+
 
   int    tot_cells = 0;  /* no. of cells used in calculation */
   float tot_u;          /* accumulated magnitudes of velocity for each cell */
@@ -442,14 +446,13 @@ float av_velocity(const t_param params, t_speed* cells, int* obstacles, t_ocl oc
   tot_u = 0.f;
 
   //loop through cell sums and totu_sums to sum all values
-  for (int jj = 0; jj < params.ny; jj++)
-  {
-    for (int ii = 0; ii < params.nx; ii++)
+    for (int jj = 0; jj <(params.ny/local[1]); jj++)
     {
-        tot_cells += cell_sums[ii+jj*params.nx];
-        tot_u += totu_sums[ii+jj*params.nx];
+        for( int ii = 0; ii <(params.nx/local[0]); ii++){
+            tot_cells += cell_sums[ii + jj *(params.nx/local[0])];
+            tot_u += totu_sums[ii + jj *(params.nx/local[0])];
+        }
     }
-  }
 
   return tot_u/(float) tot_cells;
 }

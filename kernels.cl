@@ -189,56 +189,77 @@ kernel void collision(global t_speed* cells,
     }
 }
 
+// #define blksize 16
 kernel void av_velocity(global t_speed* cells,
     global int* obstacles,
-    int nx, local float* local_cell_sums,
+    int nx,
+    local float* local_cell_sums,
     local float* local_totu_sums,
     global int* global_cell_sums,
-    global float* global_totu_sums
+    global float* global_totu_sums,
+    const int blksize
     )
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
-
+    int lx = get_local_id(0);
+    int ly = get_local_id(1);
     int tot_cells = 0;
     float tot_u = 0.0f;
-    if (!obstacles[ii + jj*nx])
+
+    int nblocks = nx/blksize;
+
+    int index = ii+jj*nx;
+    if (!obstacles[index])
     {
         /* local density total */
         float local_density = 0.f;
 
         for (int kk = 0; kk < NSPEEDS; kk++)
         {
-          local_density += cells[ii + jj*nx].speeds[kk];
+          local_density += cells[index].speeds[kk];
         }
 
         /* x-component of velocity */
-        float u_x = (cells[ii + jj*nx].speeds[1]
-                      + cells[ii + jj*nx].speeds[5]
-                      + cells[ii + jj*nx].speeds[8]
-                      - (cells[ii + jj*nx].speeds[3]
-                         + cells[ii + jj*nx].speeds[6]
-                         + cells[ii + jj*nx].speeds[7]))
+        float u_x = (cells[index].speeds[1]
+                      + cells[index].speeds[5]
+                      + cells[index].speeds[8]
+                      - (cells[index].speeds[3]
+                         + cells[index].speeds[6]
+                         + cells[index].speeds[7]))
                      / local_density;
         /* compute y velocity component */
-        float u_y = (cells[ii + jj*nx].speeds[2]
-                      + cells[ii + jj*nx].speeds[5]
-                      + cells[ii + jj*nx].speeds[6]
-                      - (cells[ii + jj*nx].speeds[4]
-                         + cells[ii + jj*nx].speeds[7]
-                         + cells[ii + jj*nx].speeds[8]))
+        float u_y = (cells[index].speeds[2]
+                      + cells[index].speeds[5]
+                      + cells[index].speeds[6]
+                      - (cells[index].speeds[4]
+                         + cells[index].speeds[7]
+                         + cells[index].speeds[8]))
                      / local_density;
         /* accumulate the norm of x- and y- velocity components */
         tot_u = sqrt((u_x * u_x) + (u_y * u_y));
         /* increase counter of inspected cells */
         ++tot_cells;
     }
-    global_cell_sums[ii+ jj*nx] = tot_cells;
-    global_totu_sums[ii+ jj*nx] = tot_u;
+    int local_id = lx + ly * blksize;
+    local_cell_sums[local_id] = tot_cells;
+    local_totu_sums[local_id] = tot_u;
 
-    // int num_wrk_items = get_local_size(0);
-    // int local_id = get_local_id(0);
-    // int group_id = get_group_id(0);
-    //
-    // int istart = (group_id * num_wrk_items + local_id) * 0;
+    barrier(CLK_LOCAL_MEM_FENCE);
+    int gx = get_group_id(0);
+    int gy = get_group_id(1);
+    int group_id = gx + gy * (nx/blksize);
+
+    int cell_sum = 0;
+    float totu_sum;
+    int num_wrk_items = get_local_size(0) * get_local_size(1);
+    if(local_id == 0){
+        totu_sum = 0;
+        for(int i = 0; i < num_wrk_items; i++){
+            cell_sum += local_cell_sums[i];
+            totu_sum += local_totu_sums[i];
+        }
+        global_cell_sums[group_id] = cell_sum;
+        global_totu_sums[group_id] = totu_sum;
+    }
 }
