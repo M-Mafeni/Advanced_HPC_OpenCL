@@ -131,11 +131,11 @@ int initialise(const char* paramfile, const char* obstaclefile,
 ** timestep calls, in order, the functions:
 ** accelerate_flow(), propagate(), rebound() & collision()
 */
-int timestep(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obstacles, t_ocl ocl);
+int timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
 int accelerate_flow(const t_param params, t_speed* cells, int* obstacles, t_ocl ocl);
 int propagate(const t_param params, t_speed* cells, t_speed* tmp_cells, t_ocl ocl);
 int rebound(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obstacles, t_ocl ocl);
-int collision(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obstacles, t_ocl ocl);
+int collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
 /* finalise, including freeing up allocated memory */
@@ -244,7 +244,7 @@ int main(int argc, char const *argv[]) {
     return 0;
 }
 
-int timestep(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obstacles, t_ocl ocl)
+int timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl)
 {
   cl_int err;
 
@@ -254,9 +254,9 @@ int timestep(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obst
     sizeof(t_speed) * params.nx * params.ny, cells, 0, NULL, NULL);
   checkError(err, "writing cells data in timestep", __LINE__);
 
-  accelerate_flow(params, cells, obstacles, ocl);
-  propagate(params, cells, tmp_cells, ocl);
-  rebound(params, cells, tmp_cells, obstacles, ocl);
+  // accelerate_flow(params, cells, obstacles, ocl);
+  // propagate(params, cells, tmp_cells, ocl);
+  // rebound(params, cells, tmp_cells, obstacles, ocl);
   collision(params, cells, tmp_cells, obstacles, ocl);
 
   // Read cells from device
@@ -353,7 +353,7 @@ int rebound(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obsta
   return EXIT_SUCCESS;
 }
 
-int collision(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obstacles, t_ocl ocl)
+int collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl)
 {
     cl_int err;
     // set kernel arguments
@@ -365,8 +365,6 @@ int collision(const t_param params, t_speed* cells, t_speed* tmp_cells, int* obs
     checkError(err, "setting collision arg 2", __LINE__);
     err = clSetKernelArg(ocl.collision, 3, sizeof(cl_int), &params.nx);
     checkError(err, "setting collision arg 3", __LINE__);
-    // err = clSetKernelArg(ocl.collision, 4, sizeof(cl_int), &params.ny);
-    // checkError(err, "setting collision arg 4", __LINE__);
     err = clSetKernelArg(ocl.collision, 4, sizeof(cl_float), &params.omega);
     checkError(err, "setting collision arg 4", __LINE__);
 
