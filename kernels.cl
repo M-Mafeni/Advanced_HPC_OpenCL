@@ -59,15 +59,16 @@ kernel void propagate(global t_speed* cells,
   /* propagate densities from neighbouring cells, following
   ** appropriate directions of travel and writing into
   ** scratch space grid */
-  tmp_cells[ii + jj*nx].speeds[0] = cells[ii + jj*nx].speeds[0]; /* central cell, no movement */
-  tmp_cells[ii + jj*nx].speeds[1] = cells[x_w + jj*nx].speeds[1]; /* east */
-  tmp_cells[ii + jj*nx].speeds[2] = cells[ii + y_s*nx].speeds[2]; /* north */
-  tmp_cells[ii + jj*nx].speeds[3] = cells[x_e + jj*nx].speeds[3]; /* west */
-  tmp_cells[ii + jj*nx].speeds[4] = cells[ii + y_n*nx].speeds[4]; /* south */
-  tmp_cells[ii + jj*nx].speeds[5] = cells[x_w + y_s*nx].speeds[5]; /* north-east */
-  tmp_cells[ii + jj*nx].speeds[6] = cells[x_e + y_s*nx].speeds[6]; /* north-west */
-  tmp_cells[ii + jj*nx].speeds[7] = cells[x_e + y_n*nx].speeds[7]; /* south-west */
-  tmp_cells[ii + jj*nx].speeds[8] = cells[x_w + y_n*nx].speeds[8]; /* south-east */
+  int index= ii + jj*params.nx;
+      tmp_cells->speeds0[index] = cells->speeds0[ii+jj*params.nx]; /* central cell, no movement */
+      tmp_cells->speedsE[index] = cells->speedsE[x_w + jj*params.nx]; /* east */
+      tmp_cells->speedsN[index] = cells->speedsN[ii + y_s*params.nx]; /* north */
+      tmp_cells->speedsW[index] = cells->speedsW[x_e + jj*params.nx]; /* west */
+      tmp_cells->speedsS[index] = cells->speedsS[ii + y_n*params.nx]; /* south */
+      tmp_cells->speedsNE[index] = cells->speedsNE[x_w + y_s*params.nx]; /* north-east */
+      tmp_cells->speedsNW[index] = cells->speedsNW[x_e + y_s*params.nx]; /* north-west */
+      tmp_cells->speedsSW[index] = cells->speedsSW[x_e + y_n*params.nx]; /* south-west */
+      tmp_cells->speedsSE[index] = cells->speedsSE[x_w + y_n*params.nx]; /* south-east */
 }
 kernel void rebound(global t_speed* cells,
                       global t_speed* tmp_cells,
