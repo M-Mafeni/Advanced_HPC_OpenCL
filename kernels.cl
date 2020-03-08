@@ -189,8 +189,7 @@ kernel void collision(global t_speed* cells,
     }
 }
 
-// #define blksize 16
-kernel void av_velocity(global t_speed* cells,
+kernel void av_velocity(global t_speed_arr* cells,
     global int* obstacles,
     int nx,
     local float* local_cell_sums,
@@ -213,33 +212,37 @@ kernel void av_velocity(global t_speed* cells,
     if (!obstacles[index])
     {
         /* local density total */
-        float local_density = 0.f;
+       float local_density = 0.f;
 
-        for (int kk = 0; kk < NSPEEDS; kk++)
-        {
-          local_density += cells[index].speeds[kk];
-        }
-
-        /* x-component of velocity */
-        float u_x = (cells[index].speeds[1]
-                      + cells[index].speeds[5]
-                      + cells[index].speeds[8]
-                      - (cells[index].speeds[3]
-                         + cells[index].speeds[6]
-                         + cells[index].speeds[7]))
-                     / local_density;
-        /* compute y velocity component */
-        float u_y = (cells[index].speeds[2]
-                      + cells[index].speeds[5]
-                      + cells[index].speeds[6]
-                      - (cells[index].speeds[4]
-                         + cells[index].speeds[7]
-                         + cells[index].speeds[8]))
-                     / local_density;
-        /* accumulate the norm of x- and y- velocity components */
-        tot_u = sqrt((u_x * u_x) + (u_y * u_y));
-        /* increase counter of inspected cells */
-        ++tot_cells;
+       local_density += cells->speeds0[index];
+       local_density += cells->speedsN[index];
+       local_density += cells->speedsS[index];
+       local_density += cells->speedsW[index];
+       local_density += cells->speedsE[index];
+       local_density += cells->speedsNW[index];
+       local_density += cells->speedsNE[index];
+       local_density += cells->speedsSW[index];
+       local_density += cells->speedsSE[index];
+       /* compute x velocity component */
+       float u_x = (cells->speedsE[index]
+                     + cells->speedsNE[index]
+                     + cells->speedsSE[index]
+                     - (cells->speedsW[index]
+                        + cells->speedsNW[index]
+                        + cells->speedsSW[index])  )
+                    / local_density;
+       /* compute y velocity component */
+       float u_y = (cells->speedsN[index]
+                     + cells->speedsNE[index]
+                     + cells->speedsNW[index]
+                     - (cells->speedsS[index]
+                        + cells->speedsSW[index]
+                        + cells->speedsSE[index]) )
+                    / local_density;
+       /* accumulate the norm of x- and y- velocity components */
+       tot_u = sqrtf((u_x * u_x) + (u_y * u_y));
+       /* increase counter of inspected cells */
+       ++tot_cells;
     }
     int local_id = lx + ly * blksize;
     local_cell_sums[local_id] = tot_cells;

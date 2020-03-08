@@ -398,7 +398,7 @@ float av_velocity(const t_param params, t_speed_arr* cells, int* obstacles, t_oc
   // Write cells to device
   err = clEnqueueWriteBuffer(
     ocl.queue, ocl.cells, CL_TRUE, 0,
-    sizeof(t_speed) * params.nx * params.ny, cells, 0, NULL, NULL);
+    sizeof(t_speed_arr) * params.nx * params.ny, cells, 0, NULL, NULL);
   checkError(err, "writing cells data in av_velocity", __LINE__);
 
  cl_mem d_cell_sums = clCreateBuffer(
