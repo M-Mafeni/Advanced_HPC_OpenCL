@@ -132,7 +132,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
 ** accelerate_flow(), propagate(), rebound() & collision()
 */
 int timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
-int accelerate_flow(const t_param params, t_speed* cells, int* obstacles, t_ocl ocl);
+int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl);
 int propagate(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, t_ocl ocl);
 int rebound(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
 int collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
@@ -268,7 +268,7 @@ int timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, i
   return EXIT_SUCCESS;
 }
 
-int accelerate_flow(const t_param params, t_speed* cells, int* obstacles, t_ocl ocl)
+int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl)
 {
   cl_int err;
 

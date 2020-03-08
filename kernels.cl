@@ -7,7 +7,7 @@ typedef struct
   float speeds[NSPEEDS];
 } t_speed;
 
-kernel void accelerate_flow(global t_speed* cells,
+kernel void accelerate_flow(global t_speed_arr* cells,
                             global int* obstacles,
                             int nx, int ny,
                             float density, float accel)
@@ -21,27 +21,28 @@ kernel void accelerate_flow(global t_speed* cells,
 
   /* get column index */
   int ii = get_global_id(0);
+  int index = ii + jj*params.nx;
 
   /* if the cell is not occupied and
   ** we don't send a negative density */
-  if (!obstacles[ii + jj* nx]
-      && (cells[ii + jj* nx].speeds[3] - w1) > 0.f
-      && (cells[ii + jj* nx].speeds[6] - w2) > 0.f
-      && (cells[ii + jj* nx].speeds[7] - w2) > 0.f)
+  if (!obstacles[index]
+      && (cells->speedsW[index] - w1) > 0.f
+      && (cells->speedsNW[index] - w2) > 0.f
+      && (cells->speedsSW[index] - w2) > 0.f)
   {
     /* increase 'east-side' densities */
-    cells[ii + jj* nx].speeds[1] += w1;
-    cells[ii + jj* nx].speeds[5] += w2;
-    cells[ii + jj* nx].speeds[8] += w2;
+    cells->speedsE[index] += w1;
+    cells->speedsNE[index] += w2;
+    cells->speedsSE[index] += w2;
     /* decrease 'west-side' densities */
-    cells[ii + jj* nx].speeds[3] -= w1;
-    cells[ii + jj* nx].speeds[6] -= w2;
-    cells[ii + jj* nx].speeds[7] -= w2;
+    cells->speedsW[index] -= w1;
+    cells->speedsNW[index] -= w2;
+    cells->speedsSW[index] -= w2;
   }
 }
 
-kernel void propagate(global t_speed* cells,
-                      global t_speed* tmp_cells,
+kernel void propagate(global t_speed_arr* cells,
+                      global t_speed_arr* tmp_cells,
                       global int* obstacles,
                       int nx, int ny)
 {
@@ -60,18 +61,18 @@ kernel void propagate(global t_speed* cells,
   ** appropriate directions of travel and writing into
   ** scratch space grid */
   int index= ii + jj*params.nx;
-      tmp_cells->speeds0[index] = cells->speeds0[ii+jj*params.nx]; /* central cell, no movement */
-      tmp_cells->speedsE[index] = cells->speedsE[x_w + jj*params.nx]; /* east */
-      tmp_cells->speedsN[index] = cells->speedsN[ii + y_s*params.nx]; /* north */
-      tmp_cells->speedsW[index] = cells->speedsW[x_e + jj*params.nx]; /* west */
-      tmp_cells->speedsS[index] = cells->speedsS[ii + y_n*params.nx]; /* south */
-      tmp_cells->speedsNE[index] = cells->speedsNE[x_w + y_s*params.nx]; /* north-east */
-      tmp_cells->speedsNW[index] = cells->speedsNW[x_e + y_s*params.nx]; /* north-west */
-      tmp_cells->speedsSW[index] = cells->speedsSW[x_e + y_n*params.nx]; /* south-west */
-      tmp_cells->speedsSE[index] = cells->speedsSE[x_w + y_n*params.nx]; /* south-east */
+  tmp_cells->speeds0[index] = cells->speeds0[ii+jj*params.nx]; /* central cell, no movement */
+  tmp_cells->speedsE[index] = cells->speedsE[x_w + jj*params.nx]; /* east */
+  tmp_cells->speedsN[index] = cells->speedsN[ii + y_s*params.nx]; /* north */
+  tmp_cells->speedsW[index] = cells->speedsW[x_e + jj*params.nx]; /* west */
+  tmp_cells->speedsS[index] = cells->speedsS[ii + y_n*params.nx]; /* south */
+  tmp_cells->speedsNE[index] = cells->speedsNE[x_w + y_s*params.nx]; /* north-east */
+  tmp_cells->speedsNW[index] = cells->speedsNW[x_e + y_s*params.nx]; /* north-west */
+  tmp_cells->speedsSW[index] = cells->speedsSW[x_e + y_n*params.nx]; /* south-west */
+  tmp_cells->speedsSE[index] = cells->speedsSE[x_w + y_n*params.nx]; /* south-east */
 }
-kernel void rebound(global t_speed* cells,
-                      global t_speed* tmp_cells,
+kernel void rebound(global t_speed_arr* cells,
+                      global t_speed_arr* tmp_cells,
                       global int* obstacles,
                       int nx)
 {
@@ -94,8 +95,8 @@ kernel void rebound(global t_speed* cells,
      }
 }
 
-kernel void collision(global t_speed* cells,
-                      global t_speed* tmp_cells,
+kernel void collision(global t_speed_arr* cells,
+                      global t_speed_arr* tmp_cells,
                       global int* obstacles,
                       int nx, float omega
                       )
