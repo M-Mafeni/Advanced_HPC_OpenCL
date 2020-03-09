@@ -7,10 +7,27 @@ typedef struct
   float speeds[NSPEEDS];
 } t_speed;
 
-kernel void accelerate_flow(global t_speed_arr* cells,
-                            global int* obstacles,
+typedef struct{
+  float *speeds0;
+  float *speedsN;
+  float *speedsS;
+  float *speedsW;
+  float *speedsE;
+  float *speedsNW;
+  float *speedsNE;
+  float *speedsSW;
+  float *speedsSE;
+} t_speed_arr;
+
+kernel void accelerate_flow(global int* obstacles,
                             int nx, int ny,
-                            float density, float accel)
+                            float density, float accel,
+                            global float* speedsW,
+                            global float* speedsNW,
+                            global float* speedsSW,
+                            global float* speedsE,
+                            global float* speedsNE,
+                            global float* speedsSE)
 {
   /* compute weighting factors */
   float w1 = density * accel / 9.0;
@@ -18,31 +35,48 @@ kernel void accelerate_flow(global t_speed_arr* cells,
 
   /* modify the 2nd row of the grid */
   int jj = ny - 2;
-
   /* get column index */
   int ii = get_global_id(0);
-  int index = ii + jj*params.nx;
+  int index = ii + jj*nx;
+  // printf("%f \n",speedsW[index]);
 
   /* if the cell is not occupied and
   ** we don't send a negative density */
   if (!obstacles[index]
-      && (cells->speedsW[index] - w1) > 0.f
-      && (cells->speedsNW[index] - w2) > 0.f
-      && (cells->speedsSW[index] - w2) > 0.f)
+      && (speedsW[index] - w1) > 0.f
+      && (speedsNW[index] - w2) > 0.f
+      && (speedsSW[index] - w2) > 0.f)
   {
     /* increase 'east-side' densities */
-    cells->speedsE[index] += w1;
-    cells->speedsNE[index] += w2;
-    cells->speedsSE[index] += w2;
+    speedsE[index] += w1;
+    speedsNE[index] += w2;
+    speedsSE[index] += w2;
     /* decrease 'west-side' densities */
-    cells->speedsW[index] -= w1;
-    cells->speedsNW[index] -= w2;
-    cells->speedsSW[index] -= w2;
+    speedsW[index] -= w1;
+    speedsNW[index] -= w2;
+    speedsSW[index] -= w2;
   }
 }
 
-kernel void propagate(global t_speed_arr* cells,
-                      global t_speed_arr* tmp_cells,
+kernel void propagate( global float* speeds0,
+                      global float* speedsN,
+                      global float* speedsS,
+                      global float* speedsW,
+                      global float* speedsE,
+                      global float* speedsNW,
+                      global float* speedsNE,
+                      global float* speedsSW,
+                      global float* speedsSE,
+
+                      global float* tmp_speeds0,
+                      global float* tmp_speedsN,
+                      global float* tmp_speedsS,
+                      global float* tmp_speedsW,
+                      global float* tmp_speedsE,
+                      global float* tmp_speedsNW,
+                      global float* tmp_speedsNE,
+                      global float* tmp_speedsSW,
+                      global float* tmp_speedsSE,
                       global int* obstacles,
                       int nx, int ny)
 {
@@ -60,46 +94,79 @@ kernel void propagate(global t_speed_arr* cells,
   /* propagate densities from neighbouring cells, following
   ** appropriate directions of travel and writing into
   ** scratch space grid */
-  int index= ii + jj*params.nx;
-  tmp_cells->speeds0[index] = cells->speeds0[ii+jj*params.nx]; /* central cell, no movement */
-  tmp_cells->speedsE[index] = cells->speedsE[x_w + jj*params.nx]; /* east */
-  tmp_cells->speedsN[index] = cells->speedsN[ii + y_s*params.nx]; /* north */
-  tmp_cells->speedsW[index] = cells->speedsW[x_e + jj*params.nx]; /* west */
-  tmp_cells->speedsS[index] = cells->speedsS[ii + y_n*params.nx]; /* south */
-  tmp_cells->speedsNE[index] = cells->speedsNE[x_w + y_s*params.nx]; /* north-east */
-  tmp_cells->speedsNW[index] = cells->speedsNW[x_e + y_s*params.nx]; /* north-west */
-  tmp_cells->speedsSW[index] = cells->speedsSW[x_e + y_n*params.nx]; /* south-west */
-  tmp_cells->speedsSE[index] = cells->speedsSE[x_w + y_n*params.nx]; /* south-east */
+  int index= ii + jj*nx;
+  tmp_speeds0[index] = speeds0[ii+jj*nx]; /* central cell, no movement */
+  tmp_speedsE[index] = speedsE[x_w + jj*nx]; /* east */
+  tmp_speedsN[index] = speedsN[ii + y_s*nx]; /* north */
+  tmp_speedsW[index] = speedsW[x_e + jj*nx]; /* west */
+  tmp_speedsS[index] = speedsS[ii + y_n*nx]; /* south */
+  tmp_speedsNE[index] = speedsNE[x_w + y_s*nx]; /* north-east */
+  tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
+  tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
+  tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
 }
-kernel void rebound(global t_speed_arr* cells,
-                      global t_speed_arr* tmp_cells,
+kernel void rebound( global float* speeds0,
+                      global float* speedsN,
+                      global float* speedsS,
+                      global float* speedsW,
+                      global float* speedsE,
+                      global float* speedsNW,
+                      global float* speedsNE,
+                      global float* speedsSW,
+                      global float* speedsSE,
+
+                      global float* tmp_speeds0,
+                      global float* tmp_speedsN,
+                      global float* tmp_speedsS,
+                      global float* tmp_speedsW,
+                      global float* tmp_speedsE,
+                      global float* tmp_speedsNW,
+                      global float* tmp_speedsNE,
+                      global float* tmp_speedsSW,
+                      global float* tmp_speedsSE,
                       global int* obstacles,
                       int nx)
 {
     /* get column and row indices */
     int ii = get_global_id(0);
     int jj = get_global_id(1);
-    int index = ii + jj*params.nx;
-    if (obstacles[jj*params.nx + ii])
+    int index = ii + jj*nx;
+    if (obstacles[jj*nx + ii])
      {
        /* called after propagate, so taking values from scratch space
        ** mirroring, and writing into main grid */
-       cells->speedsE[index] = tmp_cells->speedsW[index];
-       cells->speedsN[index] = tmp_cells->speedsS[index];
-       cells->speedsW[index] = tmp_cells->speedsE[index];
-       cells->speedsS[index] = tmp_cells->speedsN[index];
-       cells->speedsNE[index] = tmp_cells->speedsSW[index];
-       cells->speedsNW[index] = tmp_cells->speedsSE[index];
-       cells->speedsSW[index] = tmp_cells->speedsNE[index];
-       cells->speedsSE[index] = tmp_cells->speedsNW[index];
+       speedsE[index] = tmp_speedsW[index];
+       speedsN[index] = tmp_speedsS[index];
+       speedsW[index] = tmp_speedsE[index];
+       speedsS[index] = tmp_speedsN[index];
+       speedsNE[index] = tmp_speedsSW[index];
+       speedsNW[index] = tmp_speedsSE[index];
+       speedsSW[index] = tmp_speedsNE[index];
+       speedsSE[index] = tmp_speedsNW[index];
      }
 }
 
-kernel void collision(global t_speed_arr* cells,
-                      global t_speed_arr* tmp_cells,
+kernel void collision( global float* speeds0,
+                      global float* speedsN,
+                      global float* speedsS,
+                      global float* speedsW,
+                      global float* speedsE,
+                      global float* speedsNW,
+                      global float* speedsNE,
+                      global float* speedsSW,
+                      global float* speedsSE,
+
+                      global float* tmp_speeds0,
+                      global float* tmp_speedsN,
+                      global float* tmp_speedsS,
+                      global float* tmp_speedsW,
+                      global float* tmp_speedsE,
+                      global float* tmp_speedsNW,
+                      global float* tmp_speedsNE,
+                      global float* tmp_speedsSW,
+                      global float* tmp_speedsSE,
                       global int* obstacles,
-                      int nx, float omega
-                      )
+                      int nx, float omega)
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
@@ -114,31 +181,31 @@ kernel void collision(global t_speed_arr* cells,
       /* compute local density total */
       float local_density = 0.f;
 
-      int index = ii + jj*params.nx;
-      local_density += tmp_cells->speeds0[index];
-      local_density += tmp_cells->speedsN[index];
-      local_density += tmp_cells->speedsS[index];
-      local_density += tmp_cells->speedsW[index];
-      local_density += tmp_cells->speedsE[index];
-      local_density += tmp_cells->speedsNW[index];
-      local_density += tmp_cells->speedsNE[index];
-      local_density += tmp_cells->speedsSW[index];
-      local_density += tmp_cells->speedsSE[index];
+      int index = ii + jj*nx;
+      local_density += tmp_speeds0[index];
+      local_density += tmp_speedsN[index];
+      local_density += tmp_speedsS[index];
+      local_density += tmp_speedsW[index];
+      local_density += tmp_speedsE[index];
+      local_density += tmp_speedsNW[index];
+      local_density += tmp_speedsNE[index];
+      local_density += tmp_speedsSW[index];
+      local_density += tmp_speedsSE[index];
       /* compute x velocity component */
-      float u_x = (tmp_cells->speedsE[index]
-                    + tmp_cells->speedsNE[index]
-                    + tmp_cells->speedsSE[index]
-                    - (tmp_cells->speedsW[index]
-                       + tmp_cells->speedsNW[index]
-                       + tmp_cells->speedsSW[index])  )
+      float u_x = (tmp_speedsE[index]
+                    + tmp_speedsNE[index]
+                    + tmp_speedsSE[index]
+                    - (tmp_speedsW[index]
+                       + tmp_speedsNW[index]
+                       + tmp_speedsSW[index])  )
                    / local_density;
       /* compute y velocity component */
-      float u_y = (tmp_cells->speedsN[index]
-                    + tmp_cells->speedsNE[index]
-                    + tmp_cells->speedsNW[index]
-                    - (tmp_cells->speedsS[index]
-                       + tmp_cells->speedsSW[index]
-                       + tmp_cells->speedsSE[index]) )
+      float u_y = (tmp_speedsN[index]
+                    + tmp_speedsNE[index]
+                    + tmp_speedsNW[index]
+                    - (tmp_speedsS[index]
+                       + tmp_speedsSW[index]
+                       + tmp_speedsSE[index]) )
                    / local_density;
 
       /* velocity squared */
@@ -188,34 +255,35 @@ kernel void collision(global t_speed_arr* cells,
                                        - u_sq / (2.f * c_sq));
 
       /* relaxation step */
-      // for (int kk = 0; kk < NSPEEDS; kk++)
-      // {
-      //   cells[ii + jj*nx].speeds[kk] = tmp_cells[ii + jj*nx].speeds[kk]
-      //                                           + omega
-      //                                           * (d_equ[kk] - tmp_cells[ii + jj*nx].speeds[kk]);
-      // }
-
-      cells->speeds0[index] = tmp_cells->speeds0[index] + params.omega * (d_equ[0] - tmp_cells->speeds0[index]);
-        cells->speedsE[index] = tmp_cells->speedsE[index] + params.omega * (d_equ[1] - tmp_cells->speedsE[index]);
-        cells->speedsN[index] = tmp_cells->speedsN[index] + params.omega * (d_equ[2] - tmp_cells->speedsN[index]);
-        cells->speedsW[index] = tmp_cells->speedsW[index] + params.omega * (d_equ[3] - tmp_cells->speedsW[index]);
-        cells->speedsS[index] = tmp_cells->speedsS[index] + params.omega * (d_equ[4] - tmp_cells->speedsS[index]);
-        cells->speedsNE[index] = tmp_cells->speedsNE[index] + params.omega * (d_equ[5] - tmp_cells->speedsNE[index]);
-        cells->speedsNW[index] = tmp_cells->speedsNW[index] + params.omega * (d_equ[6] - tmp_cells->speedsNW[index]);
-        cells->speedsSW[index] = tmp_cells->speedsSW[index] + params.omega * (d_equ[7] - tmp_cells->speedsSW[index]);
-        cells->speedsSE[index] = tmp_cells->speedsSE[index] + params.omega * (d_equ[8] - tmp_cells->speedsSE[index]);
+      speeds0[index] = tmp_speeds0[index] + omega * (d_equ[0] - tmp_speeds0[index]);
+        speedsE[index] = tmp_speedsE[index] + omega * (d_equ[1] - tmp_speedsE[index]);
+        speedsN[index] = tmp_speedsN[index] + omega * (d_equ[2] - tmp_speedsN[index]);
+        speedsW[index] = tmp_speedsW[index] + omega * (d_equ[3] - tmp_speedsW[index]);
+        speedsS[index] = tmp_speedsS[index] + omega * (d_equ[4] - tmp_speedsS[index]);
+        speedsNE[index] = tmp_speedsNE[index] + omega * (d_equ[5] - tmp_speedsNE[index]);
+        speedsNW[index] = tmp_speedsNW[index] + omega * (d_equ[6] - tmp_speedsNW[index]);
+        speedsSW[index] = tmp_speedsSW[index] + omega * (d_equ[7] - tmp_speedsSW[index]);
+        speedsSE[index] = tmp_speedsSE[index] + omega * (d_equ[8] - tmp_speedsSE[index]);
     }
 }
 
-kernel void av_velocity(global t_speed_arr* cells,
-    global int* obstacles,
-    int nx,
-    local float* local_cell_sums,
-    local float* local_totu_sums,
-    global int* global_cell_sums,
-    global float* global_totu_sums,
-    const int blksize
-    )
+kernel void av_velocity(global float* speeds0,
+                      global float* speedsN,
+                      global float* speedsS,
+                      global float* speedsW,
+                      global float* speedsE,
+            global float* speedsNW,
+           global float* speedsNE,
+            global float* speedsSW,
+            global float* speedsSE,
+            global int* obstacles,
+            int nx,
+            local float* local_cell_sums,
+            local float* local_totu_sums,
+            global int* global_cell_sums,
+            global float* global_totu_sums,
+            const int blksize
+            )
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
@@ -232,33 +300,33 @@ kernel void av_velocity(global t_speed_arr* cells,
         /* local density total */
        float local_density = 0.f;
 
-       local_density += cells->speeds0[index];
-       local_density += cells->speedsN[index];
-       local_density += cells->speedsS[index];
-       local_density += cells->speedsW[index];
-       local_density += cells->speedsE[index];
-       local_density += cells->speedsNW[index];
-       local_density += cells->speedsNE[index];
-       local_density += cells->speedsSW[index];
-       local_density += cells->speedsSE[index];
+       local_density += speeds0[index];
+       local_density += speedsN[index];
+       local_density += speedsS[index];
+       local_density += speedsW[index];
+       local_density += speedsE[index];
+       local_density += speedsNW[index];
+       local_density += speedsNE[index];
+       local_density += speedsSW[index];
+       local_density += speedsSE[index];
        /* compute x velocity component */
-       float u_x = (cells->speedsE[index]
-                     + cells->speedsNE[index]
-                     + cells->speedsSE[index]
-                     - (cells->speedsW[index]
-                        + cells->speedsNW[index]
-                        + cells->speedsSW[index])  )
+       float u_x = (speedsE[index]
+                     + speedsNE[index]
+                     + speedsSE[index]
+                     - (speedsW[index]
+                        + speedsNW[index]
+                        + speedsSW[index])  )
                     / local_density;
        /* compute y velocity component */
-       float u_y = (cells->speedsN[index]
-                     + cells->speedsNE[index]
-                     + cells->speedsNW[index]
-                     - (cells->speedsS[index]
-                        + cells->speedsSW[index]
-                        + cells->speedsSE[index]) )
+       float u_y = (speedsN[index]
+                     + speedsNE[index]
+                     + speedsNW[index]
+                     - (speedsS[index]
+                        + speedsSW[index]
+                        + speedsSE[index]) )
                     / local_density;
        /* accumulate the norm of x- and y- velocity components */
-       tot_u = sqrtf((u_x * u_x) + (u_y * u_y));
+       tot_u = sqrt((u_x * u_x) + (u_y * u_y));
        /* increase counter of inspected cells */
        ++tot_cells;
     }
