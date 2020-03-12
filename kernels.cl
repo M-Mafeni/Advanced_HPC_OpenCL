@@ -104,6 +104,7 @@ kernel void propagate( global float* speeds0,
   tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
   tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
   tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
+
 }
 kernel void rebound( global float* speeds0,
                       global float* speedsN,
@@ -143,6 +144,8 @@ kernel void rebound( global float* speeds0,
        speedsNW[index] = tmp_speedsSE[index];
        speedsSW[index] = tmp_speedsNE[index];
        speedsSE[index] = tmp_speedsNW[index];
+     }else{
+
      }
 }
 
@@ -183,14 +186,28 @@ kernel void collision( global float* speeds0,
     const float w0 = 4.f / 9.f;  /* weighting factor */
     const float w1 = 1.f / 9.f;  /* weighting factor */
     const float w2 = 1.f / 36.f; /* weighting factor */
+    int index = ii + jj*nx;
+
 
     /* don't consider occupied cells */
-    if (!obstacles[ii + jj*nx])
+    if (obstacles[jj*nx + ii])
+     {
+       /* called after propagate, so taking values from scratch space
+       ** mirroring, and writing into main grid */
+       speedsE[index] = tmp_speedsW[index];
+       speedsN[index] = tmp_speedsS[index];
+       speedsW[index] = tmp_speedsE[index];
+       speedsS[index] = tmp_speedsN[index];
+       speedsNE[index] = tmp_speedsSW[index];
+       speedsNW[index] = tmp_speedsSE[index];
+       speedsSW[index] = tmp_speedsNE[index];
+       speedsSE[index] = tmp_speedsNW[index];
+     }
+    else
     {
       /* compute local density total */
       float local_density = 0.f;
 
-      int index = ii + jj*nx;
       local_density += tmp_speeds0[index];
       local_density += tmp_speedsN[index];
       local_density += tmp_speedsS[index];

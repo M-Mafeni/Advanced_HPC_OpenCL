@@ -350,10 +350,10 @@ float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells,
 
   accelerate_flow(params, cells, obstacles, ocl);
   propagate(params, cells, tmp_cells, ocl);
-  rebound(params, cells, tmp_cells, obstacles, ocl);
+  // rebound(params, cells, tmp_cells, obstacles, ocl);
 
 
-  return collision(params, cells, tmp_cells, obstacles, ocl);;
+  return collision(params, cells, tmp_cells, obstacles, ocl);
 }
 
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl)
