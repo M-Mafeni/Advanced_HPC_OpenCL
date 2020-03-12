@@ -166,10 +166,19 @@ kernel void collision( global float* speeds0,
                       global float* tmp_speedsSW,
                       global float* tmp_speedsSE,
                       global int* obstacles,
-                      int nx, float omega)
+                      int nx, float omega,
+                      local float* local_cell_sums,
+                      local float* local_totu_sums,
+                      global int* global_cell_sums,
+                      global float* global_totu_sums,
+                      const int blksize)
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
+    int lx = get_local_id(0);
+    int ly = get_local_id(1);
+    int tot_cells = 0;
+    float tot_u = 0.0f;
     const float c_sq = 1.f / 3.f; /* square of speed of sound */
     const float w0 = 4.f / 9.f;  /* weighting factor */
     const float w1 = 1.f / 9.f;  /* weighting factor */
@@ -210,6 +219,8 @@ kernel void collision( global float* speeds0,
 
       /* velocity squared */
       float u_sq = u_x * u_x + u_y * u_y;
+      tot_u = sqrt(u_sq);
+      tot_cells++;
 
       /* directional velocity components */
       float u[NSPEEDS];
@@ -265,6 +276,29 @@ kernel void collision( global float* speeds0,
         speedsSW[index] = tmp_speedsSW[index] + omega * (d_equ[7] - tmp_speedsSW[index]);
         speedsSE[index] = tmp_speedsSE[index] + omega * (d_equ[8] - tmp_speedsSE[index]);
     }
+
+    int local_id = lx + ly * blksize;
+    local_cell_sums[local_id] = tot_cells;
+    local_totu_sums[local_id] = tot_u;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+    int gx = get_group_id(0);
+    int gy = get_group_id(1);
+    int group_id = gx + gy * (nx/blksize);
+
+    int cell_sum = 0;
+    float totu_sum;
+    int num_wrk_items = get_local_size(0) * get_local_size(1);
+    if(local_id == 0){
+        totu_sum = 0;
+        for(int i = 0; i < num_wrk_items; i++){
+            cell_sum += local_cell_sums[i];
+            totu_sum += local_totu_sums[i];
+        }
+        global_cell_sums[group_id] = cell_sum;
+        global_totu_sums[group_id] = totu_sum;
+    }
+
 }
 
 kernel void av_velocity(global float* speeds0,
