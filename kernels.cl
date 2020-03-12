@@ -144,8 +144,6 @@ kernel void rebound( global float* speeds0,
        speedsNW[index] = tmp_speedsSE[index];
        speedsSW[index] = tmp_speedsNE[index];
        speedsSE[index] = tmp_speedsNW[index];
-     }else{
-
      }
 }
 

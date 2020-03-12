@@ -567,7 +567,7 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     checkError(err, "setting collision arg 20", __LINE__);
 
     size_t global[2] = {params.nx, params.ny};
-    size_t local[2] = {16, 16};
+    size_t local[2] = {8, 8};
 
     int* cell_sums = malloc(sizeof(int) * (params.nx/local[0]) * (params.ny/local[1]));
     // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
