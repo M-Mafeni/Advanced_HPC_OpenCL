@@ -310,7 +310,7 @@ kernel void collision( global float* speeds0,
     local_cell_sums[local_id] = tot_cells;
     local_totu_sums[local_id] = tot_u;
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // barrier(CLK_LOCAL_MEM_FENCE);
     int gx = get_group_id(0);
     int gy = get_group_id(1);
     int group_id = gx + gy * (nx/blksize);
@@ -318,14 +318,21 @@ kernel void collision( global float* speeds0,
     int cell_sum = 0;
     float totu_sum;
     int num_wrk_items = get_local_size(0) * get_local_size(1);
-    if(local_id == 0){
-        totu_sum = 0;
-        for(int i = 0; i < num_wrk_items; i++){
-            cell_sum += local_cell_sums[i];
-            totu_sum += local_totu_sums[i];
+    for(int offset =  1; offset < num_wrk_items; offset*= 2)
+    {
+        int mask = 2*offset -1;
+        barrier(CLK_LOCAL_MEM_FENCE);
+        if((local_id&mask) == 0)
+        {
+            local_cell_sums[local_id] += local_cell_sums[local_id+ offset];
+            local_totu_sums[local_id] += local_totu_sums[local_id+ offset];
         }
-        global_cell_sums[group_id] = cell_sum;
-        global_totu_sums[group_id] = totu_sum;
+    }
+    // barrier(CLK_LOCAL_MEM_FENCE);
+    if(local_id == 0)
+    {
+        global_cell_sums[group_id] = local_cell_sums[0];
+        global_totu_sums[group_id] = local_totu_sums[0];
     }
 }
 
