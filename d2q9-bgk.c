@@ -272,6 +272,7 @@ checkError(err, "writing cells data", __LINE__);
   {
 
     av_vels[tt] = timestep(params, cells, tmp_cells, obstacles, ocl);
+
     // av_vels[tt] = av_velocity(params, cells, obstacles, ocl);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
@@ -349,10 +350,8 @@ float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells,
 {
 
   accelerate_flow(params, cells, obstacles, ocl);
-  propagate(params, cells, tmp_cells, ocl);
+  // propagate(params, cells, tmp_cells, ocl);
   // rebound(params, cells, tmp_cells, obstacles, ocl);
-
-
   return collision(params, cells, tmp_cells, obstacles, ocl);
 }
 
@@ -594,6 +593,9 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
 
       err = clSetKernelArg(ocl.collision, 25, sizeof(cl_int) , &local[0]);
       checkError(err, "setting collision arg 25", __LINE__);
+
+      err = clSetKernelArg(ocl.collision, 26, sizeof(cl_int) , &params.ny);
+      checkError(err, "setting collision arg 26", __LINE__);
 
 
     err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision,
@@ -942,7 +944,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
   checkError(err, "creating program", __LINE__);
 
   // Build OpenCL program
-  err = clBuildProgram(ocl->program, 1, &ocl->device, "", NULL, NULL);
+  err = clBuildProgram(ocl->program, 1, &ocl->device, " -cl-mad-enable -cl-fast-relaxed-math", NULL, NULL);
   if (err == CL_BUILD_PROGRAM_FAILURE)
   {
     size_t sz;

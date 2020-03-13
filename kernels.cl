@@ -172,7 +172,7 @@ kernel void collision( global float* speeds0,
                       local float* local_totu_sums,
                       global int* global_cell_sums,
                       global float* global_totu_sums,
-                      const int blksize)
+                      const int blksize,int ny)
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
@@ -186,6 +186,20 @@ kernel void collision( global float* speeds0,
     const float w2 = 1.f / 36.f; /* weighting factor */
     int index = ii + jj*nx;
 
+    int y_n = (jj + 1) % ny;
+    int x_e = (ii + 1) % nx;
+    int y_s = (jj == 0) ? (jj + ny - 1) : (jj - 1);
+    int x_w = (ii == 0) ? (ii + nx - 1) : (ii - 1);
+
+    tmp_speeds0[index] = speeds0[ii+jj*nx]; /* central cell, no movement */
+    tmp_speedsE[index] = speedsE[x_w + jj*nx]; /* east */
+    tmp_speedsN[index] = speedsN[ii + y_s*nx]; /* north */
+    tmp_speedsW[index] = speedsW[x_e + jj*nx]; /* west */
+    tmp_speedsS[index] = speedsS[ii + y_n*nx]; /* south */
+    tmp_speedsNE[index] = speedsNE[x_w + y_s*nx]; /* north-east */
+    tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
+    tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
+    tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
 
     /* don't consider occupied cells */
     if (obstacles[jj*nx + ii])
@@ -313,7 +327,6 @@ kernel void collision( global float* speeds0,
         global_cell_sums[group_id] = cell_sum;
         global_totu_sums[group_id] = totu_sum;
     }
-
 }
 
 kernel void av_velocity(global float* speeds0,
