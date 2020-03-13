@@ -42,20 +42,24 @@ kernel void accelerate_flow(global int* obstacles,
 
   /* if the cell is not occupied and
   ** we don't send a negative density */
-  if (!obstacles[index]
-      && (speedsW[index] - w1) > 0.f
-      && (speedsNW[index] - w2) > 0.f
-      && (speedsSW[index] - w2) > 0.f)
-  {
-    /* increase 'east-side' densities */
-    speedsE[index] += w1;
-    speedsNE[index] += w2;
-    speedsSE[index] += w2;
-    /* decrease 'west-side' densities */
-    speedsW[index] -= w1;
-    speedsNW[index] -= w2;
-    speedsSW[index] -= w2;
-  }
+
+  float a = speedsW[index] - w1;
+  float b = speedsNW[index] - w2;
+  float c = speedsSW[index] - w2;
+  w1 = (!obstacles[index] && a >0.f && b>0.f && c>0.f) ? w1 : 0;
+  w2 = (!obstacles[index]  && a >0.f && b>0.f && c>0.f) ?w2 : 0;
+
+
+/* increase 'east-side' densities */
+speedsE[index] += w1;
+speedsNE[index] += w2;
+speedsSE[index] += w2;
+/* decrease 'west-side' densities */
+speedsW[index] -= w1;
+speedsNW[index] -= w2;
+speedsSW[index] -= w2;
+
+
 }
 
 kernel void propagate( global float* speeds0,
