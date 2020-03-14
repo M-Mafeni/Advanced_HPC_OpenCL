@@ -115,46 +115,74 @@ kernel void collision( global float* speeds0,
     int y_s = (jj == 0) ? (jj + ny - 1) : (jj - 1);
     int x_w = (ii == 0) ? (ii + nx - 1) : (ii - 1);
 
-    tmp_speeds0[index] = speeds0[ii+jj*nx]; /* central cell, no movement */
-    tmp_speedsE[index] = speedsE[x_w + jj*nx]; /* east */
-    tmp_speedsN[index] = speedsN[ii + y_s*nx]; /* north */
-    tmp_speedsW[index] = speedsW[x_e + jj*nx]; /* west */
-    tmp_speedsS[index] = speedsS[ii + y_n*nx]; /* south */
-    tmp_speedsNE[index] = speedsNE[x_w + y_s*nx]; /* north-east */
-    tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
-    tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
-    tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
+    // tmp_speeds0[index] = speeds0[ii+jj*nx]; /* central cell, no movement */
+    // tmp_speedsE[index] = speedsE[x_w + jj*nx]; /* east */
+    // tmp_speedsN[index] = speedsN[ii + y_s*nx]; /* north */
+    // tmp_speedsW[index] = speedsW[x_e + jj*nx]; /* west */
+    // tmp_speedsS[index] = speedsS[ii + y_n*nx]; /* south */
+    // tmp_speedsNE[index] = speedsNE[x_w + y_s*nx]; /* north-east */
+    // tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
+    // tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
+    // tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
 
-    //TODO Copy tmp cells into local grid
+    float speeds[9];
 
+    /*
+    ** 6 2 5
+    **  \|/
+    ** 3-0-1
+    **  /|\
+    ** 7 4 8
+    **
+    */
+
+    // tmp_speeds0[index] = speeds0[ii+jj*nx]; /* central cell, no movement */
+    // tmp_speedsE[index] = speedsE[x_w + jj*nx]; /* east */
+    // tmp_speedsN[index] = speedsN[ii + y_s*nx]; /* north */
+    // tmp_speedsW[index] = speedsW[x_e + jj*nx]; /* west */
+    // tmp_speedsS[index] = speedsS[ii + y_n*nx]; /* south */
+    // tmp_speedsNE[index] = speedsNE[x_w + y_s*nx]; /* north-east */
+    // tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
+    // tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
+    // tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
+    //copy into private memory
+    speeds[0] = speeds0[ii+jj*nx];
+    speeds[1] = speedsE[x_w + jj*nx];
+    speeds[2] = speedsN[ii + y_s*nx];
+    speeds[3] = speedsW[x_e + jj*nx];
+    speeds[4] = speedsS[ii + y_n*nx];
+    speeds[5] = speedsNE[x_w + y_s*nx];
+    speeds[6] = speedsNW[x_e + y_s*nx];
+    speeds[7] = speedsSW[x_e + y_n*nx];
+    speeds[8] = speedsSE[x_w + y_n*nx];
 
     /* compute local density total */
     float local_density = 0.f;
 
-    local_density += tmp_speeds0[index];
-    local_density += tmp_speedsN[index];
-    local_density += tmp_speedsS[index];
-    local_density += tmp_speedsW[index];
-    local_density += tmp_speedsE[index];
-    local_density += tmp_speedsNW[index];
-    local_density += tmp_speedsNE[index];
-    local_density += tmp_speedsSW[index];
-    local_density += tmp_speedsSE[index];
+    local_density += speeds[0];
+    local_density += speeds[2];
+    local_density += speeds[4];
+    local_density += speeds[3];
+    local_density += speeds[1];
+    local_density += speeds[6];
+    local_density += speeds[5];
+    local_density += speeds[7];
+    local_density += speeds[8];
     /* compute x velocity component */
-    float u_x = (tmp_speedsE[index]
-                  + tmp_speedsNE[index]
-                  + tmp_speedsSE[index]
-                  - (tmp_speedsW[index]
-                     + tmp_speedsNW[index]
-                     + tmp_speedsSW[index])  )
+    float u_x = (speeds[1]
+                  + speeds[5]
+                  + speeds[8]
+                  - (speeds[3]
+                     + speeds[6]
+                     + speeds[7])  )
                  / local_density;
     /* compute y velocity component */
-    float u_y = (tmp_speedsN[index]
-                  + tmp_speedsNE[index]
-                  + tmp_speedsNW[index]
-                  - (tmp_speedsS[index]
-                     + tmp_speedsSW[index]
-                     + tmp_speedsSE[index]) )
+    float u_y = (speeds[2]
+                  + speeds[5]
+                  + speeds[6]
+                  - (speeds[4]
+                     + speeds[7]
+                     + speeds[8]) )
                  / local_density;
 
     /* velocity squared */
@@ -205,17 +233,17 @@ kernel void collision( global float* speeds0,
                                      - u_sq / (2.f * c_sq));
 
     /* don't consider occupied cells */
-   speeds0[index] = (obstacles[index]) ? speeds0[index] : tmp_speeds0[index] + omega * (d_equ[0] - tmp_speeds0[index]);
-   speedsE[index] = (obstacles[index]) ? tmp_speedsW[index] : tmp_speedsE[index] + omega * (d_equ[1] - tmp_speedsE[index]);
-   speedsN[index] = (obstacles[index]) ? tmp_speedsS[index] : tmp_speedsN[index] + omega * (d_equ[2] - tmp_speedsN[index]);
-   speedsW[index] = (obstacles[index]) ? tmp_speedsE[index] : tmp_speedsW[index] + omega * (d_equ[3] - tmp_speedsW[index]);
-   speedsS[index] = (obstacles[index]) ? tmp_speedsN[index] : tmp_speedsS[index] + omega * (d_equ[4] - tmp_speedsS[index]);
-   speedsNE[index] = (obstacles[index]) ? tmp_speedsSW[index] : tmp_speedsNE[index] + omega * (d_equ[5] - tmp_speedsNE[index]) ;
-   speedsNW[index] = (obstacles[index]) ? tmp_speedsSE[index] : tmp_speedsNW[index] + omega * (d_equ[6] - tmp_speedsNW[index]);
-   speedsSW[index] = (obstacles[index]) ? tmp_speedsNE[index] : tmp_speedsSW[index] + omega * (d_equ[7] - tmp_speedsSW[index]);
-   speedsSE[index] = (obstacles[index]) ? tmp_speedsNW[index] : tmp_speedsSE[index] + omega * (d_equ[8] - tmp_speedsSE[index]);
+   speeds0[index] = (obstacles[index]) ? speeds[0] : speeds[0] + omega * (d_equ[0] - speeds[0]);
+   speedsE[index] = (obstacles[index]) ? speeds[3] : speeds[1] + omega * (d_equ[1] - speeds[1]);
+   speedsN[index] = (obstacles[index]) ? speeds[4] : speeds[2] + omega * (d_equ[2] - speeds[2]);
+   speedsW[index] = (obstacles[index]) ? speeds[1] : speeds[3] + omega * (d_equ[3] - speeds[3]);
+   speedsS[index] = (obstacles[index]) ? speeds[2] : speeds[4] + omega * (d_equ[4] - speeds[4]);
+   speedsNE[index] = (obstacles[index]) ? speeds[7] : speeds[5] + omega * (d_equ[5] - speeds[5]);
+   speedsNW[index] = (obstacles[index]) ? speeds[8] : speeds[6] + omega * (d_equ[6] - speeds[6]);
+   speedsSW[index] = (obstacles[index]) ? speeds[5] : speeds[7] + omega * (d_equ[7] - speeds[7]);
+   speedsSE[index] = (obstacles[index]) ? speeds[6] : speeds[8] + omega * (d_equ[8] - speeds[8]);
     tot_u = (!obstacles[index]) ? sqrt(u_sq) : 0;
-    tot_cells = (!obstacles[index]) ? 1 : 0;
+    tot_cells = (!obstacles[index]);
 
     int local_id = lx + ly * blksize;
     local_cell_sums[local_id] = tot_cells;

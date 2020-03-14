@@ -277,7 +277,6 @@ checkError(err, "writing cells data", __LINE__);
 
     av_vels[tt] = timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
 
-    // av_vels[tt] = av_velocity(params, cells, obstacles, ocl);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -406,7 +405,7 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     cl_int err;
 
     size_t global[2] = {params.nx, params.ny};
-    size_t local[2] = {8, 8};
+    size_t local[2] = {BLOCKSIZE, BLOCKSIZE};
 
     err = clSetKernelArg(ocl.collision, 0, sizeof(cl_mem), &ocl.speeds0);
     checkError(err, "setting collision arg 0", __LINE__);
@@ -517,14 +516,10 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     tot_u = 0.f;
 
     //loop through cell sums and totu_sums to sum all values
-      for (int jj = 0; jj <(params.ny/local[1]); jj++)
-      {
-          for( int ii = 0; ii <(params.nx/local[0]); ii++){
-              tot_cells += cell_sums[ii + jj *(params.nx/local[0])];
-              tot_u += totu_sums[ii + jj *(params.nx/local[0])];
-          }
-      }
-
+    for (size_t i = 0; i < (params.ny/local[1]) * (params.nx/local[0]) ; i++) {
+        tot_cells += cell_sums[i];
+        tot_u += totu_sums[i];
+    }
     return tot_u/(float) tot_cells;
 }
 
