@@ -395,6 +395,22 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl)
 {
     cl_int err;
+
+    size_t global[2] = {params.nx, params.ny};
+    size_t local[2] = {8, 8};
+
+    int* cell_sums = malloc(sizeof(int) * (params.nx/local[0]) * (params.ny/local[1]));
+    // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
+
+    float* totu_sums = malloc(sizeof(float) * (params.nx/local[0]) * (params.ny/local[1]));
+
+    cl_mem d_cell_sums = clCreateBuffer(
+    ocl.context, CL_MEM_WRITE_ONLY,
+    sizeof(cl_int) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
+
+    cl_mem d_totu_sums = clCreateBuffer(
+      ocl.context, CL_MEM_WRITE_ONLY,
+      sizeof(cl_float) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
     // set kernel arguments
     err = clSetKernelArg(ocl.collision, 0, sizeof(cl_mem), &ocl.speeds0);
     checkError(err, "setting collision arg 0", __LINE__);
@@ -439,38 +455,43 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     checkError(err, "setting collision arg 19", __LINE__);
     err = clSetKernelArg(ocl.collision, 20, sizeof(cl_float), &params.omega);
     checkError(err, "setting collision arg 20", __LINE__);
+    err = clSetKernelArg(ocl.collision, 21, sizeof(cl_int) * local[0] * local[1], NULL);
+    checkError(err, "setting collision arg 21", __LINE__);
+    err = clSetKernelArg(ocl.collision, 22, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 22", __LINE__);
 
-    size_t global[2] = {params.nx, params.ny};
-    size_t local[2] = {8, 8};
+    err = clSetKernelArg(ocl.collision, 23, sizeof(cl_mem) , &d_cell_sums);
+    checkError(err, "setting collision arg 24", __LINE__);
 
-    int* cell_sums = malloc(sizeof(int) * (params.nx/local[0]) * (params.ny/local[1]));
-    // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
+    err = clSetKernelArg(ocl.collision, 24, sizeof(cl_mem) , &d_totu_sums);
+    checkError(err, "setting collision arg 24", __LINE__);
 
-    float* totu_sums = malloc(sizeof(float) * (params.nx/local[0]) * (params.ny/local[1]));
+    err = clSetKernelArg(ocl.collision, 25, sizeof(cl_int) , &local[0]);
+    checkError(err, "setting collision arg 25", __LINE__);
 
-   cl_mem d_cell_sums = clCreateBuffer(
-    ocl.context, CL_MEM_WRITE_ONLY,
-    sizeof(cl_int) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
+    err = clSetKernelArg(ocl.collision, 26, sizeof(cl_int) , &params.ny);
+    checkError(err, "setting collision arg 26", __LINE__);
 
-    cl_mem d_totu_sums = clCreateBuffer(
-      ocl.context, CL_MEM_WRITE_ONLY,
-      sizeof(cl_float) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
-      err = clSetKernelArg(ocl.collision, 21, sizeof(cl_int) * local[0] * local[1], NULL);
-      checkError(err, "setting collision arg 21", __LINE__);
-      err = clSetKernelArg(ocl.collision, 22, sizeof(cl_float) * local[0] * local[1] , NULL);
-      checkError(err, "setting collision arg 22", __LINE__);
+    //for local grids
+    err = clSetKernelArg(ocl.collision, 27, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 27", __LINE__);
+    err = clSetKernelArg(ocl.collision, 28, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 28", __LINE__);
+    err = clSetKernelArg(ocl.collision, 29, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 29", __LINE__);
+    err = clSetKernelArg(ocl.collision, 30, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 30", __LINE__);
+    err = clSetKernelArg(ocl.collision, 31, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 31", __LINE__);
+    err = clSetKernelArg(ocl.collision, 32, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 32", __LINE__);
+    err = clSetKernelArg(ocl.collision, 33, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 33", __LINE__);
+    err = clSetKernelArg(ocl.collision, 34, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 34", __LINE__);
+    err = clSetKernelArg(ocl.collision, 35, sizeof(cl_float) * local[0] * local[1] , NULL);
+    checkError(err, "setting collision arg 35", __LINE__);
 
-      err = clSetKernelArg(ocl.collision, 23, sizeof(cl_mem) , &d_cell_sums);
-      checkError(err, "setting collision arg 24", __LINE__);
-
-      err = clSetKernelArg(ocl.collision, 24, sizeof(cl_mem) , &d_totu_sums);
-      checkError(err, "setting collision arg 24", __LINE__);
-
-      err = clSetKernelArg(ocl.collision, 25, sizeof(cl_int) , &local[0]);
-      checkError(err, "setting collision arg 25", __LINE__);
-
-      err = clSetKernelArg(ocl.collision, 26, sizeof(cl_int) , &params.ny);
-      checkError(err, "setting collision arg 26", __LINE__);
 
 
     err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision,

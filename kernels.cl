@@ -19,9 +19,9 @@ typedef struct{
   float *speedsSE;
 } t_speed_arr;
 
-kernel void accelerate_flow(global int* obstacles,
-                            int nx, int ny,
-                            float density, float accel,
+kernel void accelerate_flow(const global int* obstacles,
+                            const int nx, const int ny,
+                            const float density, const float accel,
                             global float* speedsW,
                             global float* speedsNW,
                             global float* speedsSW,
@@ -81,13 +81,22 @@ kernel void collision( global float* speeds0,
                       global float* tmp_speedsNE,
                       global float* tmp_speedsSW,
                       global float* tmp_speedsSE,
-                      global int* obstacles,
-                      int nx, float omega,
+                      const global int* obstacles,
+                      const int nx, const float omega,
                       local float* local_cell_sums,
                       local float* local_totu_sums,
                       global int* global_cell_sums,
                       global float* global_totu_sums,
-                      const int blksize,int ny)
+                      const int blksize,const int ny,
+                      local float* loc_speeds0,
+                      local float* loc_speedsN,
+                      local float* loc_speedsS,
+                      local float* loc_speedsW,
+                      local float* loc_speedsE,
+                      local float* loc_speedsNW,
+                      local float* loc_speedsNE,
+                      local float* loc_speedsSW,
+                      local float* loc_speedsSE)
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
@@ -115,6 +124,8 @@ kernel void collision( global float* speeds0,
     tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
     tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
     tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
+
+    //TODO Copy tmp cells into local grid
 
 
     /* compute local density total */
