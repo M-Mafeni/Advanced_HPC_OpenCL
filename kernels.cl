@@ -71,32 +71,13 @@ kernel void collision( global float* speeds0,
                       global float* speedsNE,
                       global float* speedsSW,
                       global float* speedsSE,
-
-                      global float* tmp_speeds0,
-                      global float* tmp_speedsN,
-                      global float* tmp_speedsS,
-                      global float* tmp_speedsW,
-                      global float* tmp_speedsE,
-                      global float* tmp_speedsNW,
-                      global float* tmp_speedsNE,
-                      global float* tmp_speedsSW,
-                      global float* tmp_speedsSE,
                       const global int* obstacles,
                       const int nx, const float omega,
                       local float* local_cell_sums,
                       local float* local_totu_sums,
                       global int* global_cell_sums,
                       global float* global_totu_sums,
-                      const int blksize,const int ny,
-                      local float* loc_speeds0,
-                      local float* loc_speedsN,
-                      local float* loc_speedsS,
-                      local float* loc_speedsW,
-                      local float* loc_speedsE,
-                      local float* loc_speedsNW,
-                      local float* loc_speedsNE,
-                      local float* loc_speedsSW,
-                      local float* loc_speedsSE)
+                      const int blksize,const int ny)
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
@@ -115,16 +96,6 @@ kernel void collision( global float* speeds0,
     int y_s = (jj == 0) ? (jj + ny - 1) : (jj - 1);
     int x_w = (ii == 0) ? (ii + nx - 1) : (ii - 1);
 
-    // tmp_speeds0[index] = speeds0[ii+jj*nx]; /* central cell, no movement */
-    // tmp_speedsE[index] = speedsE[x_w + jj*nx]; /* east */
-    // tmp_speedsN[index] = speedsN[ii + y_s*nx]; /* north */
-    // tmp_speedsW[index] = speedsW[x_e + jj*nx]; /* west */
-    // tmp_speedsS[index] = speedsS[ii + y_n*nx]; /* south */
-    // tmp_speedsNE[index] = speedsNE[x_w + y_s*nx]; /* north-east */
-    // tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
-    // tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
-    // tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
-
     float speeds[9];
 
     /*
@@ -136,15 +107,6 @@ kernel void collision( global float* speeds0,
     **
     */
 
-    // tmp_speeds0[index] = speeds0[ii+jj*nx]; /* central cell, no movement */
-    // tmp_speedsE[index] = speedsE[x_w + jj*nx]; /* east */
-    // tmp_speedsN[index] = speedsN[ii + y_s*nx]; /* north */
-    // tmp_speedsW[index] = speedsW[x_e + jj*nx]; /* west */
-    // tmp_speedsS[index] = speedsS[ii + y_n*nx]; /* south */
-    // tmp_speedsNE[index] = speedsNE[x_w + y_s*nx]; /* north-east */
-    // tmp_speedsNW[index] = speedsNW[x_e + y_s*nx]; /* north-west */
-    // tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
-    // tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
     //copy into private memory
     speeds[0] = speeds0[ii+jj*nx];
     speeds[1] = speedsE[x_w + jj*nx];

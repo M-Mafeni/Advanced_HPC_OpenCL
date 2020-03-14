@@ -93,8 +93,6 @@ typedef struct
   cl_kernel collision;
   cl_kernel av_velocity;
 
-  cl_mem cells;
-  cl_mem tmp_cells;
   cl_mem obstacles;
   cl_mem speeds0;
   cl_mem speedsN;
@@ -105,16 +103,6 @@ typedef struct
   cl_mem speedsNE;
   cl_mem speedsSW;
   cl_mem speedsSE;
-
-  cl_mem tmp_speeds0;
-  cl_mem tmp_speedsN;
-  cl_mem tmp_speedsS;
-  cl_mem tmp_speedsW;
-  cl_mem tmp_speedsE;
-  cl_mem tmp_speedsNW;
-  cl_mem tmp_speedsNE;
-  cl_mem tmp_speedsSW;
-  cl_mem tmp_speedsSE;
 
   cl_mem cell_sums;
   cl_mem totu_sums;
@@ -426,68 +414,28 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     err = clSetKernelArg(ocl.collision, 8, sizeof(cl_mem), &ocl.speedsSE);
     checkError(err, "setting collision arg 8", __LINE__);
     //
-    err = clSetKernelArg(ocl.collision, 9, sizeof(cl_mem), &ocl.tmp_speeds0);
+    err = clSetKernelArg(ocl.collision, 9, sizeof(cl_mem), &ocl.obstacles);
     checkError(err, "setting collision arg 9", __LINE__);
-    err = clSetKernelArg(ocl.collision, 10, sizeof(cl_mem), &ocl.tmp_speedsN);
+    err = clSetKernelArg(ocl.collision, 10, sizeof(cl_int), &params.nx);
     checkError(err, "setting collision arg 10", __LINE__);
-    err = clSetKernelArg(ocl.collision, 11, sizeof(cl_mem), &ocl.tmp_speedsS);
+    err = clSetKernelArg(ocl.collision, 11, sizeof(cl_float), &params.omega);
     checkError(err, "setting collision arg 11", __LINE__);
-    err = clSetKernelArg(ocl.collision, 12, sizeof(cl_mem), &ocl.tmp_speedsW);
+    err = clSetKernelArg(ocl.collision, 12, sizeof(cl_int) * local[0] * local[1], NULL);
     checkError(err, "setting collision arg 12", __LINE__);
-    err = clSetKernelArg(ocl.collision, 13, sizeof(cl_mem), &ocl.tmp_speedsE);
+    err = clSetKernelArg(ocl.collision, 13, sizeof(cl_float) * local[0] * local[1] , NULL);
     checkError(err, "setting collision arg 13", __LINE__);
-    err = clSetKernelArg(ocl.collision, 14, sizeof(cl_mem), &ocl.tmp_speedsNW);
+
+    err = clSetKernelArg(ocl.collision, 14, sizeof(cl_mem) , &ocl.cell_sums);
     checkError(err, "setting collision arg 14", __LINE__);
-    err = clSetKernelArg(ocl.collision, 15, sizeof(cl_mem), &ocl.tmp_speedsNE);
+
+    err = clSetKernelArg(ocl.collision, 15, sizeof(cl_mem) , &ocl.totu_sums);
     checkError(err, "setting collision arg 15", __LINE__);
-    err = clSetKernelArg(ocl.collision, 16, sizeof(cl_mem), &ocl.tmp_speedsSW);
+
+    err = clSetKernelArg(ocl.collision, 16, sizeof(cl_int) , &local[0]);
     checkError(err, "setting collision arg 16", __LINE__);
-    err = clSetKernelArg(ocl.collision, 17, sizeof(cl_mem), &ocl.tmp_speedsSE);
+
+    err = clSetKernelArg(ocl.collision, 17, sizeof(cl_int) , &params.ny);
     checkError(err, "setting collision arg 17", __LINE__);
-    err = clSetKernelArg(ocl.collision, 18, sizeof(cl_mem), &ocl.obstacles);
-    checkError(err, "setting collision arg 18", __LINE__);
-    err = clSetKernelArg(ocl.collision, 19, sizeof(cl_int), &params.nx);
-    checkError(err, "setting collision arg 19", __LINE__);
-    err = clSetKernelArg(ocl.collision, 20, sizeof(cl_float), &params.omega);
-    checkError(err, "setting collision arg 20", __LINE__);
-    err = clSetKernelArg(ocl.collision, 21, sizeof(cl_int) * local[0] * local[1], NULL);
-    checkError(err, "setting collision arg 21", __LINE__);
-    err = clSetKernelArg(ocl.collision, 22, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 22", __LINE__);
-
-    err = clSetKernelArg(ocl.collision, 23, sizeof(cl_mem) , &ocl.cell_sums);
-    checkError(err, "setting collision arg 24", __LINE__);
-
-    err = clSetKernelArg(ocl.collision, 24, sizeof(cl_mem) , &ocl.totu_sums);
-    checkError(err, "setting collision arg 24", __LINE__);
-
-    err = clSetKernelArg(ocl.collision, 25, sizeof(cl_int) , &local[0]);
-    checkError(err, "setting collision arg 25", __LINE__);
-
-    err = clSetKernelArg(ocl.collision, 26, sizeof(cl_int) , &params.ny);
-    checkError(err, "setting collision arg 26", __LINE__);
-
-    //for local grids
-    err = clSetKernelArg(ocl.collision, 27, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 27", __LINE__);
-    err = clSetKernelArg(ocl.collision, 28, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 28", __LINE__);
-    err = clSetKernelArg(ocl.collision, 29, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 29", __LINE__);
-    err = clSetKernelArg(ocl.collision, 30, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 30", __LINE__);
-    err = clSetKernelArg(ocl.collision, 31, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 31", __LINE__);
-    err = clSetKernelArg(ocl.collision, 32, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 32", __LINE__);
-    err = clSetKernelArg(ocl.collision, 33, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 33", __LINE__);
-    err = clSetKernelArg(ocl.collision, 34, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 34", __LINE__);
-    err = clSetKernelArg(ocl.collision, 35, sizeof(cl_float) * local[0] * local[1] , NULL);
-    checkError(err, "setting collision arg 35", __LINE__);
-
-
 
     err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision,
                                  2, NULL, global, local, 0, NULL, NULL);
@@ -856,10 +804,6 @@ int initialise(const char* paramfile, const char* obstaclefile,
   checkError(err, "creating av_velocity kernel", __LINE__);
 
   // Allocate OpenCL buffers
-  ocl->cells = clCreateBuffer(
-ocl->context, CL_MEM_READ_WRITE,
-    sizeof(t_speed_arr), NULL, &err);
-
 ocl->speeds0 =clCreateBuffer(
       ocl->context, CL_MEM_READ_WRITE,
       sizeof(cl_float) * params->ny * params->nx, NULL, &err);
@@ -906,56 +850,6 @@ checkError(err, "creating cells buffer", __LINE__);
           sizeof(cl_float) * params->ny * params->nx, NULL, &err);
   checkError(err, "creating cells buffer", __LINE__);
 
-  ocl->tmp_cells = clCreateBuffer(
-    ocl->context, CL_MEM_READ_WRITE,
-    sizeof(t_speed_arr), NULL, &err);
-    ocl->tmp_speeds0 =clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-
-    ocl->tmp_speedsN = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-
-    ocl->tmp_speedsS = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-    ocl->tmp_speedsW = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-    ocl->tmp_speedsE = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-    ocl->tmp_speedsNW = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-    ocl->tmp_speedsNE = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-    ocl->tmp_speedsSW = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-    checkError(err, "creating tmp_cells buffer", __LINE__);
-
-    ocl->tmp_speedsSE = clCreateBuffer(
-          ocl->context, CL_MEM_READ_WRITE,
-          sizeof(cl_float) * params->ny * params->nx, NULL, &err);
-  checkError(err, "creating tmp_cells buffer", __LINE__);
-
   ocl->obstacles = clCreateBuffer(
     ocl->context, CL_MEM_READ_WRITE,
     sizeof(cl_int) * params->nx * params->ny, NULL, &err);
@@ -989,9 +883,7 @@ int finalise(const t_param* params, t_speed_arr** cells_ptr, t_speed_arr** tmp_c
 
   free(*av_vels_ptr);
   *av_vels_ptr = NULL;
-
-  clReleaseMemObject(ocl.cells);
-  clReleaseMemObject(ocl.tmp_cells);
+  
   clReleaseMemObject(ocl.obstacles);
   clReleaseKernel(ocl.accelerate_flow);
   clReleaseProgram(ocl.program);
