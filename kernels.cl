@@ -116,110 +116,95 @@ kernel void collision( global float* speeds0,
     tmp_speedsSW[index] = speedsSW[x_e + y_n*nx]; /* south-west */
     tmp_speedsSE[index] = speedsSE[x_w + y_n*nx]; /* south-east */
 
+
+    /* compute local density total */
+    float local_density = 0.f;
+
+    local_density += tmp_speeds0[index];
+    local_density += tmp_speedsN[index];
+    local_density += tmp_speedsS[index];
+    local_density += tmp_speedsW[index];
+    local_density += tmp_speedsE[index];
+    local_density += tmp_speedsNW[index];
+    local_density += tmp_speedsNE[index];
+    local_density += tmp_speedsSW[index];
+    local_density += tmp_speedsSE[index];
+    /* compute x velocity component */
+    float u_x = (tmp_speedsE[index]
+                  + tmp_speedsNE[index]
+                  + tmp_speedsSE[index]
+                  - (tmp_speedsW[index]
+                     + tmp_speedsNW[index]
+                     + tmp_speedsSW[index])  )
+                 / local_density;
+    /* compute y velocity component */
+    float u_y = (tmp_speedsN[index]
+                  + tmp_speedsNE[index]
+                  + tmp_speedsNW[index]
+                  - (tmp_speedsS[index]
+                     + tmp_speedsSW[index]
+                     + tmp_speedsSE[index]) )
+                 / local_density;
+
+    /* velocity squared */
+    float u_sq = u_x * u_x + u_y * u_y;
+
+
+    /* directional velocity components */
+    float u[NSPEEDS];
+    u[1] =   u_x;        /* east */
+    u[2] =         u_y;  /* north */
+    u[3] = - u_x;        /* west */
+    u[4] =       - u_y;  /* south */
+    u[5] =   u_x + u_y;  /* north-east */
+    u[6] = - u_x + u_y;  /* north-west */
+    u[7] = - u_x - u_y;  /* south-west */
+    u[8] =   u_x - u_y;  /* south-east */
+
+    /* equilibrium densities */
+    float d_equ[NSPEEDS];
+    /* zero velocity density: weight w0 */
+    d_equ[0] = w0 * local_density
+               * (1.f - u_sq / (2.f * c_sq));
+    /* axis speeds: weight w1 */
+    d_equ[1] = w1 * local_density * (1.f + u[1] / c_sq
+                                     + (u[1] * u[1]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    d_equ[2] = w1 * local_density * (1.f + u[2] / c_sq
+                                     + (u[2] * u[2]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    d_equ[3] = w1 * local_density * (1.f + u[3] / c_sq
+                                     + (u[3] * u[3]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    d_equ[4] = w1 * local_density * (1.f + u[4] / c_sq
+                                     + (u[4] * u[4]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    /* diagonal speeds: weight w2 */
+    d_equ[5] = w2 * local_density * (1.f + u[5] / c_sq
+                                     + (u[5] * u[5]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    d_equ[6] = w2 * local_density * (1.f + u[6] / c_sq
+                                     + (u[6] * u[6]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    d_equ[7] = w2 * local_density * (1.f + u[7] / c_sq
+                                     + (u[7] * u[7]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    d_equ[8] = w2 * local_density * (1.f + u[8] / c_sq
+                                     + (u[8] * u[8]) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+
     /* don't consider occupied cells */
-    if (obstacles[jj*nx + ii])
-     {
-       /* called after propagate, so taking values from scratch space
-       ** mirroring, and writing into main grid */
-       speedsE[index] = tmp_speedsW[index];
-       speedsN[index] = tmp_speedsS[index];
-       speedsW[index] = tmp_speedsE[index];
-       speedsS[index] = tmp_speedsN[index];
-       speedsNE[index] = tmp_speedsSW[index];
-       speedsNW[index] = tmp_speedsSE[index];
-       speedsSW[index] = tmp_speedsNE[index];
-       speedsSE[index] = tmp_speedsNW[index];
-     }
-    else
-    {
-      /* compute local density total */
-      float local_density = 0.f;
-
-      local_density += tmp_speeds0[index];
-      local_density += tmp_speedsN[index];
-      local_density += tmp_speedsS[index];
-      local_density += tmp_speedsW[index];
-      local_density += tmp_speedsE[index];
-      local_density += tmp_speedsNW[index];
-      local_density += tmp_speedsNE[index];
-      local_density += tmp_speedsSW[index];
-      local_density += tmp_speedsSE[index];
-      /* compute x velocity component */
-      float u_x = (tmp_speedsE[index]
-                    + tmp_speedsNE[index]
-                    + tmp_speedsSE[index]
-                    - (tmp_speedsW[index]
-                       + tmp_speedsNW[index]
-                       + tmp_speedsSW[index])  )
-                   / local_density;
-      /* compute y velocity component */
-      float u_y = (tmp_speedsN[index]
-                    + tmp_speedsNE[index]
-                    + tmp_speedsNW[index]
-                    - (tmp_speedsS[index]
-                       + tmp_speedsSW[index]
-                       + tmp_speedsSE[index]) )
-                   / local_density;
-
-      /* velocity squared */
-      float u_sq = u_x * u_x + u_y * u_y;
-      tot_u = sqrt(u_sq);
-      tot_cells++;
-
-      /* directional velocity components */
-      float u[NSPEEDS];
-      u[1] =   u_x;        /* east */
-      u[2] =         u_y;  /* north */
-      u[3] = - u_x;        /* west */
-      u[4] =       - u_y;  /* south */
-      u[5] =   u_x + u_y;  /* north-east */
-      u[6] = - u_x + u_y;  /* north-west */
-      u[7] = - u_x - u_y;  /* south-west */
-      u[8] =   u_x - u_y;  /* south-east */
-
-      /* equilibrium densities */
-      float d_equ[NSPEEDS];
-      /* zero velocity density: weight w0 */
-      d_equ[0] = w0 * local_density
-                 * (1.f - u_sq / (2.f * c_sq));
-      /* axis speeds: weight w1 */
-      d_equ[1] = w1 * local_density * (1.f + u[1] / c_sq
-                                       + (u[1] * u[1]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-      d_equ[2] = w1 * local_density * (1.f + u[2] / c_sq
-                                       + (u[2] * u[2]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-      d_equ[3] = w1 * local_density * (1.f + u[3] / c_sq
-                                       + (u[3] * u[3]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-      d_equ[4] = w1 * local_density * (1.f + u[4] / c_sq
-                                       + (u[4] * u[4]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-      /* diagonal speeds: weight w2 */
-      d_equ[5] = w2 * local_density * (1.f + u[5] / c_sq
-                                       + (u[5] * u[5]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-      d_equ[6] = w2 * local_density * (1.f + u[6] / c_sq
-                                       + (u[6] * u[6]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-      d_equ[7] = w2 * local_density * (1.f + u[7] / c_sq
-                                       + (u[7] * u[7]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-      d_equ[8] = w2 * local_density * (1.f + u[8] / c_sq
-                                       + (u[8] * u[8]) / (2.f * c_sq * c_sq)
-                                       - u_sq / (2.f * c_sq));
-
-      /* relaxation step */
-      speeds0[index] = tmp_speeds0[index] + omega * (d_equ[0] - tmp_speeds0[index]);
-        speedsE[index] = tmp_speedsE[index] + omega * (d_equ[1] - tmp_speedsE[index]);
-        speedsN[index] = tmp_speedsN[index] + omega * (d_equ[2] - tmp_speedsN[index]);
-        speedsW[index] = tmp_speedsW[index] + omega * (d_equ[3] - tmp_speedsW[index]);
-        speedsS[index] = tmp_speedsS[index] + omega * (d_equ[4] - tmp_speedsS[index]);
-        speedsNE[index] = tmp_speedsNE[index] + omega * (d_equ[5] - tmp_speedsNE[index]);
-        speedsNW[index] = tmp_speedsNW[index] + omega * (d_equ[6] - tmp_speedsNW[index]);
-        speedsSW[index] = tmp_speedsSW[index] + omega * (d_equ[7] - tmp_speedsSW[index]);
-        speedsSE[index] = tmp_speedsSE[index] + omega * (d_equ[8] - tmp_speedsSE[index]);
-    }
+   speeds0[index] = (obstacles[index]) ? speeds0[index] : tmp_speeds0[index] + omega * (d_equ[0] - tmp_speeds0[index]);
+   speedsE[index] = (obstacles[index]) ? tmp_speedsW[index] : tmp_speedsE[index] + omega * (d_equ[1] - tmp_speedsE[index]);
+   speedsN[index] = (obstacles[index]) ? tmp_speedsS[index] : tmp_speedsN[index] + omega * (d_equ[2] - tmp_speedsN[index]);
+   speedsW[index] = (obstacles[index]) ? tmp_speedsE[index] : tmp_speedsW[index] + omega * (d_equ[3] - tmp_speedsW[index]);
+   speedsS[index] = (obstacles[index]) ? tmp_speedsN[index] : tmp_speedsS[index] + omega * (d_equ[4] - tmp_speedsS[index]);
+   speedsNE[index] = (obstacles[index]) ? tmp_speedsSW[index] : tmp_speedsNE[index] + omega * (d_equ[5] - tmp_speedsNE[index]) ;
+   speedsNW[index] = (obstacles[index]) ? tmp_speedsSE[index] : tmp_speedsNW[index] + omega * (d_equ[6] - tmp_speedsNW[index]);
+   speedsSW[index] = (obstacles[index]) ? tmp_speedsNE[index] : tmp_speedsSW[index] + omega * (d_equ[7] - tmp_speedsSW[index]);
+   speedsSE[index] = (obstacles[index]) ? tmp_speedsNW[index] : tmp_speedsSE[index] + omega * (d_equ[8] - tmp_speedsSE[index]);
+    tot_u = (!obstacles[index]) ? sqrt(u_sq) : 0;
+    tot_cells = (!obstacles[index]) ? 1 : 0;
 
     int local_id = lx + ly * blksize;
     local_cell_sums[local_id] = tot_cells;
@@ -242,7 +227,6 @@ kernel void collision( global float* speeds0,
         local_cell_sums[local_id] += a;
         local_totu_sums[local_id] += b;
     }
-    // barrier(CLK_LOCAL_MEM_FENCE);
     if(local_id == 0)
     {
         global_cell_sums[group_id] = local_cell_sums[0];
