@@ -67,6 +67,7 @@
 #define FINALSTATEFILE  "final_state.dat"
 #define AVVELSFILE      "av_vels.dat"
 #define OCLFILE         "kernels.cl"
+#define BLOCKSIZE      8
 
 /* struct to hold the parameter values */
 typedef struct
@@ -114,6 +115,9 @@ typedef struct
   cl_mem tmp_speedsNE;
   cl_mem tmp_speedsSW;
   cl_mem tmp_speedsSE;
+
+  cl_mem cell_sums;
+  cl_mem totu_sums;
 } t_ocl;
 
 /* struct to hold the 'speed' values */
@@ -148,9 +152,9 @@ int initialise(const char* paramfile, const char* obstaclefile,
 ** timestep calls, in order, the functions:
 ** accelerate_flow(), propagate(), rebound() & collision()
 */
-float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
+float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl);
-float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
+float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
 /* finalise, including freeing up allocated memory */
@@ -208,6 +212,10 @@ int main(int argc, char* argv[])
 
   /* initialise our data structures and load values from file */
   initialise(paramfile, obstaclefile, &params, &cells, &tmp_cells, &obstacles, &av_vels, &ocl);
+  int* cell_sums = malloc(sizeof(int) * (params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE));
+  // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
+
+  float* totu_sums = malloc(sizeof(float) * (params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE));
 
   /* iterate for maxIters timesteps */
   gettimeofday(&timstr, NULL);
@@ -267,7 +275,7 @@ checkError(err, "writing cells data", __LINE__);
   for (int tt = 0; tt < params.maxIters; tt++)
   {
 
-    av_vels[tt] = timestep(params, cells, tmp_cells, obstacles, ocl);
+    av_vels[tt] = timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
 
     // av_vels[tt] = av_velocity(params, cells, obstacles, ocl);
 #ifdef DEBUG
@@ -342,11 +350,11 @@ checkError(err, "writing cells data", __LINE__);
   return EXIT_SUCCESS;
 }
 
-float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl)
+float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums)
 {
 
   accelerate_flow(params, cells, obstacles, ocl);
-  return collision(params, cells, tmp_cells, obstacles, ocl);
+  return collision(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
 }
 
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl)
@@ -392,26 +400,14 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 }
 
 
-float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl)
+float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,
+    int* cell_sums, float* totu_sums)
 {
     cl_int err;
 
     size_t global[2] = {params.nx, params.ny};
     size_t local[2] = {8, 8};
 
-    int* cell_sums = malloc(sizeof(int) * (params.nx/local[0]) * (params.ny/local[1]));
-    // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
-
-    float* totu_sums = malloc(sizeof(float) * (params.nx/local[0]) * (params.ny/local[1]));
-
-    cl_mem d_cell_sums = clCreateBuffer(
-    ocl.context, CL_MEM_WRITE_ONLY,
-    sizeof(cl_int) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
-
-    cl_mem d_totu_sums = clCreateBuffer(
-      ocl.context, CL_MEM_WRITE_ONLY,
-      sizeof(cl_float) * (params.nx/local[0]) * (params.ny/local[1]), NULL, &err);
-    // set kernel arguments
     err = clSetKernelArg(ocl.collision, 0, sizeof(cl_mem), &ocl.speeds0);
     checkError(err, "setting collision arg 0", __LINE__);
     err = clSetKernelArg(ocl.collision, 1, sizeof(cl_mem), &ocl.speedsN);
@@ -460,10 +456,10 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     err = clSetKernelArg(ocl.collision, 22, sizeof(cl_float) * local[0] * local[1] , NULL);
     checkError(err, "setting collision arg 22", __LINE__);
 
-    err = clSetKernelArg(ocl.collision, 23, sizeof(cl_mem) , &d_cell_sums);
+    err = clSetKernelArg(ocl.collision, 23, sizeof(cl_mem) , &ocl.cell_sums);
     checkError(err, "setting collision arg 24", __LINE__);
 
-    err = clSetKernelArg(ocl.collision, 24, sizeof(cl_mem) , &d_totu_sums);
+    err = clSetKernelArg(ocl.collision, 24, sizeof(cl_mem) , &ocl.totu_sums);
     checkError(err, "setting collision arg 24", __LINE__);
 
     err = clSetKernelArg(ocl.collision, 25, sizeof(cl_int) , &local[0]);
@@ -504,12 +500,12 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
 
     // read back cell_sums and totu_sums
     err = clEnqueueReadBuffer(
-      ocl.queue, d_cell_sums, CL_TRUE, 0,
+      ocl.queue, ocl.cell_sums, CL_TRUE, 0,
       sizeof(cl_int) * (params.nx/local[0]) * (params.ny/local[1]), cell_sums, 0, NULL, NULL);
     checkError(err, "reading cell_sums data in av_velocity", __LINE__);
 
     err = clEnqueueReadBuffer(
-      ocl.queue, d_totu_sums, CL_TRUE, 0,
+      ocl.queue, ocl.totu_sums, CL_TRUE, 0,
       sizeof(cl_float) * (params.nx/local[0]) * (params.ny/local[1]), totu_sums, 0, NULL, NULL);
     checkError(err, "reading totu_sums data in av_velocity", __LINE__);
 
@@ -969,6 +965,14 @@ checkError(err, "creating cells buffer", __LINE__);
     ocl->context, CL_MEM_READ_WRITE,
     sizeof(cl_int) * params->nx * params->ny, NULL, &err);
   checkError(err, "creating obstacles buffer", __LINE__);
+
+  ocl->cell_sums = clCreateBuffer(
+  ocl->context, CL_MEM_WRITE_ONLY,
+  sizeof(cl_int) * (params->nx/BLOCKSIZE) * (params->ny/BLOCKSIZE), NULL, &err);
+
+  ocl->totu_sums = clCreateBuffer(
+    ocl->context, CL_MEM_WRITE_ONLY,
+    sizeof(cl_float) * (params->nx/BLOCKSIZE) * (params->ny/BLOCKSIZE), NULL, &err);
 
   return EXIT_SUCCESS;
 }
