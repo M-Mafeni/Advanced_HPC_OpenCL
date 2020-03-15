@@ -92,6 +92,7 @@ typedef struct
   cl_kernel  accelerate_flow;
   cl_kernel collision;
   cl_kernel av_velocity;
+  cl_kernel reduce;
 
   cl_mem obstacles;
   cl_mem speeds0;
@@ -106,6 +107,7 @@ typedef struct
 
   cl_mem cell_sums;
   cl_mem totu_sums;
+  cl_mem av_vels;
 } t_ocl;
 
 /* struct to hold the 'speed' values */
@@ -142,6 +144,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl);
+float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n, t_ocl ocl,const t_param params);
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
@@ -218,52 +221,57 @@ int main(int argc, char* argv[])
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speeds0, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speeds0, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cells0 data", __LINE__);
 
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsN, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsN, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cellsN data", __LINE__);
 
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsS, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsS, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cellsS data", __LINE__);
 
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsW, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsW, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cellsW data", __LINE__);
 
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsE, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cellsE data", __LINE__);
 
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsNE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNE, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cellsNE data", __LINE__);
 
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsNW, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNW, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cellsNW data", __LINE__);
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsSW, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSW, 0, NULL, NULL);
-  checkError(err, "writing cells data", __LINE__);
+  checkError(err, "writing cellsSW data", __LINE__);
 
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsSE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
+checkError(err, "writing cellsSE data", __LINE__);
 
-checkError(err, "writing cells data", __LINE__);
+  err = clEnqueueWriteBuffer(
+      ocl.queue, ocl.av_vels, CL_TRUE, 0,
+      sizeof(cl_float) * params.maxIters, av_vels, 0, NULL, NULL);
+  checkError(err, "writing av_vels data", __LINE__);
 
   for (int tt = 0; tt < params.maxIters; tt++)
   {
 
-    av_vels[tt] = timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
+    timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
+    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE),ocl,params);
 
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
@@ -271,6 +279,10 @@ checkError(err, "writing cells data", __LINE__);
     printf("tot density: %.12E\n", total_density(params, cells));
 #endif
   }
+  err = clEnqueueReadBuffer(
+      ocl.queue, ocl.av_vels, CL_TRUE, 0,
+      sizeof(cl_float) * params.maxIters, av_vels, 0, NULL, NULL);
+  checkError(err, "reading av_vels data", __LINE__);
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speeds0, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speeds0, 0, NULL, NULL);
@@ -385,7 +397,34 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 
   return EXIT_SUCCESS;
 }
+float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl ocl,const t_param params){
+    cl_int err;
+    // size_t global[1] = {1};
+    err = clSetKernelArg(ocl.reduce, 0, sizeof(cl_mem), &ocl.cell_sums);
+    checkError(err, "setting reduce arg 0", __LINE__);
 
+    err = clSetKernelArg(ocl.reduce, 1, sizeof(cl_mem), &ocl.totu_sums);
+    checkError(err, "setting reduce arg 1", __LINE__);
+
+    err = clSetKernelArg(ocl.reduce, 2, sizeof(cl_mem), &ocl.av_vels);
+    checkError(err, "setting reduce arg 2", __LINE__);
+
+    err = clSetKernelArg(ocl.reduce, 3, sizeof(cl_int), &tt);
+    checkError(err, "setting reduce arg 3", __LINE__);
+
+    err = clSetKernelArg(ocl.reduce, 4, sizeof(cl_int), &n);
+    checkError(err, "setting reduce arg 4", __LINE__);
+
+    err = clEnqueueTask(ocl.queue, ocl.reduce,
+                                 0, NULL, NULL);
+    checkError(err, "enqueueing reduce kernel", __LINE__);
+
+    // Wait for kernel to finish
+    err = clFinish(ocl.queue);
+    checkError(err, "waiting for reduce kernel", __LINE__);
+
+    return 0;
+}
 
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,
     int* cell_sums, float* totu_sums)
@@ -445,30 +484,7 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     err = clFinish(ocl.queue);
     checkError(err, "waiting for collision kernel", __LINE__);
 
-    // read back cell_sums and totu_sums
-    err = clEnqueueReadBuffer(
-      ocl.queue, ocl.cell_sums, CL_TRUE, 0,
-      sizeof(cl_int) * (params.nx/local[0]) * (params.ny/local[1]), cell_sums, 0, NULL, NULL);
-    checkError(err, "reading cell_sums data in av_velocity", __LINE__);
-
-    err = clEnqueueReadBuffer(
-      ocl.queue, ocl.totu_sums, CL_TRUE, 0,
-      sizeof(cl_float) * (params.nx/local[0]) * (params.ny/local[1]), totu_sums, 0, NULL, NULL);
-    checkError(err, "reading totu_sums data in av_velocity", __LINE__);
-
-
-    int    tot_cells = 0;  /* no. of cells used in calculation */
-    float tot_u;          /* accumulated magnitudes of velocity for each cell */
-
-    /* initialise */
-    tot_u = 0.f;
-
-    //loop through cell sums and totu_sums to sum all values
-    for (size_t i = 0; i < (params.ny/local[1]) * (params.nx/local[0]) ; i++) {
-        tot_cells += cell_sums[i];
-        tot_u += totu_sums[i];
-    }
-    return tot_u/(float) tot_cells;
+    return 0;
 }
 
 float av_velocity(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl)
@@ -802,6 +818,8 @@ int initialise(const char* paramfile, const char* obstaclefile,
   checkError(err, "creating collision kernel", __LINE__);
   ocl->av_velocity = clCreateKernel(ocl->program,"av_velocity",&err);
   checkError(err, "creating av_velocity kernel", __LINE__);
+  ocl->reduce = clCreateKernel(ocl->program,"reduce",&err);
+  checkError(err, "creating reduce kernel", __LINE__);
 
   // Allocate OpenCL buffers
 ocl->speeds0 =clCreateBuffer(
@@ -863,6 +881,10 @@ checkError(err, "creating cells buffer", __LINE__);
     ocl->context, CL_MEM_WRITE_ONLY,
     sizeof(cl_float) * (params->nx/BLOCKSIZE) * (params->ny/BLOCKSIZE), NULL, &err);
 
+ ocl->av_vels = clCreateBuffer(
+   ocl->context, CL_MEM_WRITE_ONLY,
+   sizeof(cl_float) * params->maxIters, NULL, &err);
+
   return EXIT_SUCCESS;
 }
 
@@ -883,7 +905,7 @@ int finalise(const t_param* params, t_speed_arr** cells_ptr, t_speed_arr** tmp_c
 
   free(*av_vels_ptr);
   *av_vels_ptr = NULL;
-  
+
   clReleaseMemObject(ocl.obstacles);
   clReleaseKernel(ocl.accelerate_flow);
   clReleaseProgram(ocl.program);

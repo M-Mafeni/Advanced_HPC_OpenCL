@@ -38,7 +38,6 @@ kernel void accelerate_flow(const global int* obstacles,
   /* get column index */
   int ii = get_global_id(0);
   int index = ii + jj*nx;
-  // printf("%f \n",speedsW[index]);
 
   /* if the cell is not occupied and
   ** we don't send a negative density */
@@ -46,8 +45,8 @@ kernel void accelerate_flow(const global int* obstacles,
   float a = speedsW[index] - w1;
   float b = speedsNW[index] - w2;
   float c = speedsSW[index] - w2;
-  w1 = (!obstacles[index] && a >0.f && b>0.f && c>0.f) ? w1 : 0;
-  w2 = (!obstacles[index]  && a >0.f && b>0.f && c>0.f) ?w2 : 0;
+  w1 = (!obstacles[index] && a >0.f && b>0.f && c>0.f) * w1;
+  w2 = (!obstacles[index]  && a >0.f && b>0.f && c>0.f) * w2;
 
 
 /* increase 'east-side' densities */
@@ -59,16 +58,18 @@ speedsW[index] -= w1;
 speedsNW[index] -= w2;
 speedsSW[index] -= w2;
 
-
 }
 
-float calc_equilibrium(float weight, float u,float u_sq,float c_sq){
-    float x = weight * (1.f + u / c_sq
-                                     + (u * u) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
-    return x;
+kernel void reduce(global int* cell_sums, global float* totu_sums, global float* av_vels,int tt,int N){
+    int tot_cells = 0;
+    float tot_u = 0;
+    for(int i = 0; i < N; i++)
+    {
+        tot_cells += cell_sums[i];
+        tot_u += totu_sums[i];
+    }
+    av_vels[tt] = tot_u/(float) tot_cells;
 }
-
 kernel void collision( global float* speeds0,
                       global float* speedsN,
                       global float* speedsS,
@@ -215,7 +216,7 @@ kernel void collision( global float* speeds0,
    speedsNW[index] = (obstacles[index]) ? speeds[8] : speeds[6] + omega * (d_equ[6] - speeds[6]);
    speedsSW[index] = (obstacles[index]) ? speeds[5] : speeds[7] + omega * (d_equ[7] - speeds[7]);
    speedsSE[index] = (obstacles[index]) ? speeds[6] : speeds[8] + omega * (d_equ[8] - speeds[8]);
-    tot_u = (!obstacles[index]) ? sqrt(u_sq) : 0;
+    tot_u = (!obstacles[index]) * sqrt(u_sq) ;
     tot_cells = (!obstacles[index]);
 
     int local_id = lx + ly * blksize;
