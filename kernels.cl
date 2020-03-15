@@ -62,6 +62,13 @@ speedsSW[index] -= w2;
 
 }
 
+float calc_equilibrium(float weight, float u,float u_sq,float c_sq){
+    float x = weight * (1.f + u / c_sq
+                                     + (u * u) / (2.f * c_sq * c_sq)
+                                     - u_sq / (2.f * c_sq));
+    return x;
+}
+
 kernel void collision( global float* speeds0,
                       global float* speedsN,
                       global float* speedsS,
@@ -164,35 +171,39 @@ kernel void collision( global float* speeds0,
 
     /* equilibrium densities */
     float d_equ[NSPEEDS];
+    float a =w1 * local_density;
+    float b = w2 * local_density;
+    float c = (2.f * c_sq * c_sq);
+    float d = u_sq / (2.f * c_sq);
     /* zero velocity density: weight w0 */
     d_equ[0] = w0 * local_density
-               * (1.f - u_sq / (2.f * c_sq));
+               * (1.f - d);
     /* axis speeds: weight w1 */
-    d_equ[1] = w1 * local_density * (1.f + u[1] / c_sq
-                                     + (u[1] * u[1]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
-    d_equ[2] = w1 * local_density * (1.f + u[2] / c_sq
-                                     + (u[2] * u[2]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
-    d_equ[3] = w1 * local_density * (1.f + u[3] / c_sq
-                                     + (u[3] * u[3]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
-    d_equ[4] = w1 * local_density * (1.f + u[4] / c_sq
-                                     + (u[4] * u[4]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
+    d_equ[1] = a * (1.f + u[1] / c_sq
+                                     + (u[1] * u[1]) / c
+                                     - d);
+    d_equ[2] = a * (1.f + u[2] / c_sq
+                                     + (u[2] * u[2]) / c
+                                     - d);
+    d_equ[3] = a * (1.f + u[3] / c_sq
+                                     + (u[3] * u[3]) / c
+                                     - d);
+    d_equ[4] = a * (1.f + u[4] / c_sq
+                                     + (u[4] * u[4]) / c
+                                     - d);
     /* diagonal speeds: weight w2 */
-    d_equ[5] = w2 * local_density * (1.f + u[5] / c_sq
-                                     + (u[5] * u[5]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
-    d_equ[6] = w2 * local_density * (1.f + u[6] / c_sq
-                                     + (u[6] * u[6]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
-    d_equ[7] = w2 * local_density * (1.f + u[7] / c_sq
-                                     + (u[7] * u[7]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
-    d_equ[8] = w2 * local_density * (1.f + u[8] / c_sq
-                                     + (u[8] * u[8]) / (2.f * c_sq * c_sq)
-                                     - u_sq / (2.f * c_sq));
+    d_equ[5] = b * (1.f + u[5] / c_sq
+                                     + (u[5] * u[5]) / c
+                                     - d);
+    d_equ[6] = b * (1.f + u[6] / c_sq
+                                     + (u[6] * u[6]) / c
+                                     - d);
+    d_equ[7] = b * (1.f + u[7] / c_sq
+                                     + (u[7] * u[7]) / c
+                                     - d);
+    d_equ[8] = b * (1.f + u[8] / c_sq
+                                     + (u[8] * u[8]) / c
+                                     - d);
 
     /* don't consider occupied cells */
    speeds0[index] = (obstacles[index]) ? speeds[0] : speeds[0] + omega * (d_equ[0] - speeds[0]);
