@@ -67,7 +67,7 @@
 #define FINALSTATEFILE  "final_state.dat"
 #define AVVELSFILE      "av_vels.dat"
 #define OCLFILE         "kernels.cl"
-#define BLOCKSIZE      8
+#define BLOCKSIZE      16
 
 /* struct to hold the parameter values */
 typedef struct
@@ -262,17 +262,11 @@ int main(int argc, char* argv[])
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
 checkError(err, "writing cellsSE data", __LINE__);
 
-  err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.av_vels, CL_TRUE, 0,
-      sizeof(cl_float) * params.maxIters, av_vels, 0, NULL, NULL);
-  checkError(err, "writing av_vels data", __LINE__);
-
   for (int tt = 0; tt < params.maxIters; tt++)
   {
 
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
     reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE),ocl,params);
-
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -286,48 +280,48 @@ checkError(err, "writing cellsSE data", __LINE__);
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speeds0, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speeds0, 0, NULL, NULL);
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cells0 data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsN, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsN, 0, NULL, NULL);
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cellsN data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsS, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsS, 0, NULL, NULL);
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cellsS data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsW, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsW, 0, NULL, NULL);
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cellsW data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsE, 0, NULL, NULL);
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cellsE data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsNE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNE, 0, NULL, NULL);
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cellsNE data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsNW, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNW, 0, NULL, NULL);
- checkError(err, "reading cells data", __LINE__);
+ checkError(err, "reading cellsNW data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsSW, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSW, 0, NULL, NULL);
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cellsSW data", __LINE__);
 
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.speedsSE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
 
-  checkError(err, "reading cells data", __LINE__);
+  checkError(err, "reading cellsSE data", __LINE__);
 
   gettimeofday(&timstr, NULL);
   toc = timstr.tv_sec + (timstr.tv_usec / 1000000.0);

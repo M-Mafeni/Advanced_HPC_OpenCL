@@ -172,7 +172,7 @@ kernel void collision( global float* speeds0,
 
     /* equilibrium densities */
     float d_equ[NSPEEDS];
-    float a =w1 * local_density;
+    float a = w1 * local_density;
     float b = w2 * local_density;
     float c = (2.f * c_sq * c_sq);
     float d = u_sq / (2.f * c_sq);
