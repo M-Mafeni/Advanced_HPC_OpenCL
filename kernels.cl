@@ -63,12 +63,21 @@ speedsSW[index] -= w2;
 kernel void reduce(global int* cell_sums, global float* totu_sums, global float* av_vels,int tt,int N){
     int tot_cells = 0;
     float tot_u = 0;
-    for(int i = 0; i < N; i++)
-    {
-        tot_cells += cell_sums[i];
-        tot_u += totu_sums[i];
+    int id = get_global_id(0);
+    for(int offset = 1; offset < N; offset *= 2){
+        int mask = 2*offset - 1;
+        barrier(CLK_GLOBAL_MEM_FENCE);
+        int x = (id&mask);
+        int a = (x==0) ?cell_sums[id+ offset] : 0;
+        float b = (x==0)?totu_sums[id+ offset] : 0.f;
+        cell_sums[id] += a;
+        totu_sums[id] += b;
     }
-    av_vels[tt] = tot_u/(float) tot_cells;
+    barrier(CLK_GLOBAL_MEM_FENCE);
+    if(id == 0)
+    {
+        av_vels[tt] = totu_sums[0]/(float) cell_sums[0];
+    }
 }
 kernel void collision( global float* speeds0,
                       global float* speedsN,

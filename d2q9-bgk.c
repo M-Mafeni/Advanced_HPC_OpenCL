@@ -392,7 +392,8 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 }
 float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params){
     cl_int err;
-    size_t global[1] = {1};
+    int num_groups = (params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE);
+    size_t global[1] = {num_groups};
     err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->cell_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
 
@@ -408,8 +409,10 @@ float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* 
     err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &n);
     checkError(err, "setting reduce arg 4", __LINE__);
 
-    err = clEnqueueTask(ocl->queue, ocl->reduce,
-                                 0, NULL, NULL);
+    // err = clEnqueueTask(ocl->queue, ocl->reduce,
+    //                              0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(ocl->queue, ocl->reduce,
+                                 1, NULL, global, NULL, 0, NULL, NULL);
     checkError(err, "enqueueing reduce kernel", __LINE__);
 
     return 0;
