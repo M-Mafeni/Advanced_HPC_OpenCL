@@ -143,9 +143,9 @@ int initialise(const char* paramfile, const char* obstaclefile,
 ** accelerate_flow(), propagate(), rebound() & collision()
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
-int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl);
+int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
 float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n, t_ocl ocl,const t_param params);
-float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl, int* cell_sums,float* totu_sums);
+float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
 /* finalise, including freeing up allocated memory */
@@ -346,47 +346,47 @@ checkError(err, "writing cellsSE data", __LINE__);
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums)
 {
 
-  accelerate_flow(params, cells, obstacles, ocl);
-  return collision(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
+  accelerate_flow(params, cells, obstacles, &ocl);
+  return collision(params, cells, tmp_cells, obstacles, &ocl,cell_sums,totu_sums);
 }
 
-int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl ocl)
+int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl)
 {
   cl_int err;
 
   // Set kernel arguments
-  err = clSetKernelArg(ocl.accelerate_flow, 0, sizeof(cl_mem), &ocl.obstacles);
+  err = clSetKernelArg(ocl->accelerate_flow, 0, sizeof(cl_mem), &ocl->obstacles);
   checkError(err, "setting accelerate_flow arg 0", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 1, sizeof(cl_int), &params.nx);
+  err = clSetKernelArg(ocl->accelerate_flow, 1, sizeof(cl_int), &params.nx);
   checkError(err, "setting accelerate_flow arg 1", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 2, sizeof(cl_int), &params.ny);
+  err = clSetKernelArg(ocl->accelerate_flow, 2, sizeof(cl_int), &params.ny);
   checkError(err, "setting accelerate_flow arg 2", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 3, sizeof(cl_float), &params.density);
+  err = clSetKernelArg(ocl->accelerate_flow, 3, sizeof(cl_float), &params.density);
   checkError(err, "setting accelerate_flow arg 3", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 4, sizeof(cl_float), &params.accel);
+  err = clSetKernelArg(ocl->accelerate_flow, 4, sizeof(cl_float), &params.accel);
   checkError(err, "setting accelerate_flow arg 4", __LINE__);
 
-  err = clSetKernelArg(ocl.accelerate_flow, 5, sizeof(cl_mem) , &ocl.speedsW);
+  err = clSetKernelArg(ocl->accelerate_flow, 5, sizeof(cl_mem) , &ocl->speedsW);
   checkError(err, "setting accelerate_flow arg 5", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 6, sizeof(cl_mem), &ocl.speedsNW);
+  err = clSetKernelArg(ocl->accelerate_flow, 6, sizeof(cl_mem), &ocl->speedsNW);
   checkError(err, "setting accelerate_flow arg 6", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 7, sizeof(cl_mem), &ocl.speedsSW);
+  err = clSetKernelArg(ocl->accelerate_flow, 7, sizeof(cl_mem), &ocl->speedsSW);
   checkError(err, "setting accelerate_flow arg 7 ", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 8, sizeof(cl_mem), &ocl.speedsE);
+  err = clSetKernelArg(ocl->accelerate_flow, 8, sizeof(cl_mem), &ocl->speedsE);
   checkError(err, "setting accelerate_flow arg 8", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 9, sizeof(cl_mem), &ocl.speedsNE);
+  err = clSetKernelArg(ocl->accelerate_flow, 9, sizeof(cl_mem), &ocl->speedsNE);
   checkError(err, "setting accelerate_flow arg 9", __LINE__);
-  err = clSetKernelArg(ocl.accelerate_flow, 10, sizeof(cl_mem), &ocl.speedsSE);
+  err = clSetKernelArg(ocl->accelerate_flow, 10, sizeof(cl_mem), &ocl->speedsSE);
   checkError(err, "setting accelerate_flow arg 10", __LINE__);
 
   // Enqueue kernel
   size_t global[1] = {params.nx};
-  err = clEnqueueNDRangeKernel(ocl.queue, ocl.accelerate_flow,
+  err = clEnqueueNDRangeKernel(ocl->queue, ocl->accelerate_flow,
                                1, NULL, global, NULL, 0, NULL, NULL);
   checkError(err, "enqueueing accelerate_flow kernel", __LINE__);
 
   // Wait for kernel to finish
-  err = clFinish(ocl.queue);
+  err = clFinish(ocl->queue);
   checkError(err, "waiting for accelerate_flow kernel", __LINE__);
 
   return EXIT_SUCCESS;
@@ -420,7 +420,7 @@ float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl o
     return 0;
 }
 
-float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,
+float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl,
     int* cell_sums, float* totu_sums)
 {
     cl_int err;
@@ -428,54 +428,54 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     size_t global[2] = {params.nx, params.ny};
     size_t local[2] = {BLOCKSIZE, BLOCKSIZE};
 
-    err = clSetKernelArg(ocl.collision, 0, sizeof(cl_mem), &ocl.speeds0);
+    err = clSetKernelArg(ocl->collision, 0, sizeof(cl_mem), &ocl->speeds0);
     checkError(err, "setting collision arg 0", __LINE__);
-    err = clSetKernelArg(ocl.collision, 1, sizeof(cl_mem), &ocl.speedsN);
+    err = clSetKernelArg(ocl->collision, 1, sizeof(cl_mem), &ocl->speedsN);
     checkError(err, "setting collision arg 1", __LINE__);
-    err = clSetKernelArg(ocl.collision, 2, sizeof(cl_mem), &ocl.speedsS);
+    err = clSetKernelArg(ocl->collision, 2, sizeof(cl_mem), &ocl->speedsS);
     checkError(err, "setting collision arg 2", __LINE__);
-    err = clSetKernelArg(ocl.collision, 3, sizeof(cl_mem), &ocl.speedsW);
+    err = clSetKernelArg(ocl->collision, 3, sizeof(cl_mem), &ocl->speedsW);
     checkError(err, "setting collision arg 3", __LINE__);
-    err = clSetKernelArg(ocl.collision, 4, sizeof(cl_mem), &ocl.speedsE);
+    err = clSetKernelArg(ocl->collision, 4, sizeof(cl_mem), &ocl->speedsE);
     checkError(err, "setting collision arg 4", __LINE__);
-    err = clSetKernelArg(ocl.collision, 5, sizeof(cl_mem), &ocl.speedsNW);
+    err = clSetKernelArg(ocl->collision, 5, sizeof(cl_mem), &ocl->speedsNW);
     checkError(err, "setting collision arg 5", __LINE__);
-    err = clSetKernelArg(ocl.collision, 6, sizeof(cl_mem), &ocl.speedsNE);
+    err = clSetKernelArg(ocl->collision, 6, sizeof(cl_mem), &ocl->speedsNE);
     checkError(err, "setting collision arg 6", __LINE__);
-    err = clSetKernelArg(ocl.collision, 7, sizeof(cl_mem), &ocl.speedsSW);
+    err = clSetKernelArg(ocl->collision, 7, sizeof(cl_mem), &ocl->speedsSW);
     checkError(err, "setting collision arg 7", __LINE__);
-    err = clSetKernelArg(ocl.collision, 8, sizeof(cl_mem), &ocl.speedsSE);
+    err = clSetKernelArg(ocl->collision, 8, sizeof(cl_mem), &ocl->speedsSE);
     checkError(err, "setting collision arg 8", __LINE__);
     //
-    err = clSetKernelArg(ocl.collision, 9, sizeof(cl_mem), &ocl.obstacles);
+    err = clSetKernelArg(ocl->collision, 9, sizeof(cl_mem), &ocl->obstacles);
     checkError(err, "setting collision arg 9", __LINE__);
-    err = clSetKernelArg(ocl.collision, 10, sizeof(cl_int), &params.nx);
+    err = clSetKernelArg(ocl->collision, 10, sizeof(cl_int), &params.nx);
     checkError(err, "setting collision arg 10", __LINE__);
-    err = clSetKernelArg(ocl.collision, 11, sizeof(cl_float), &params.omega);
+    err = clSetKernelArg(ocl->collision, 11, sizeof(cl_float), &params.omega);
     checkError(err, "setting collision arg 11", __LINE__);
-    err = clSetKernelArg(ocl.collision, 12, sizeof(cl_int) * local[0] * local[1], NULL);
+    err = clSetKernelArg(ocl->collision, 12, sizeof(cl_int) * local[0] * local[1], NULL);
     checkError(err, "setting collision arg 12", __LINE__);
-    err = clSetKernelArg(ocl.collision, 13, sizeof(cl_float) * local[0] * local[1] , NULL);
+    err = clSetKernelArg(ocl->collision, 13, sizeof(cl_float) * local[0] * local[1] , NULL);
     checkError(err, "setting collision arg 13", __LINE__);
 
-    err = clSetKernelArg(ocl.collision, 14, sizeof(cl_mem) , &ocl.cell_sums);
+    err = clSetKernelArg(ocl->collision, 14, sizeof(cl_mem) , &ocl->cell_sums);
     checkError(err, "setting collision arg 14", __LINE__);
 
-    err = clSetKernelArg(ocl.collision, 15, sizeof(cl_mem) , &ocl.totu_sums);
+    err = clSetKernelArg(ocl->collision, 15, sizeof(cl_mem) , &ocl->totu_sums);
     checkError(err, "setting collision arg 15", __LINE__);
 
-    err = clSetKernelArg(ocl.collision, 16, sizeof(cl_int) , &local[0]);
+    err = clSetKernelArg(ocl->collision, 16, sizeof(cl_int) , &local[0]);
     checkError(err, "setting collision arg 16", __LINE__);
 
-    err = clSetKernelArg(ocl.collision, 17, sizeof(cl_int) , &params.ny);
+    err = clSetKernelArg(ocl->collision, 17, sizeof(cl_int) , &params.ny);
     checkError(err, "setting collision arg 17", __LINE__);
 
-    err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision,
+    err = clEnqueueNDRangeKernel(ocl->queue, ocl->collision,
                                  2, NULL, global, local, 0, NULL, NULL);
     checkError(err, "enqueueing collision kernel", __LINE__);
 
     // Wait for kernel to finish
-    err = clFinish(ocl.queue);
+    err = clFinish(ocl->queue);
     checkError(err, "waiting for collision kernel", __LINE__);
 
     return 0;
