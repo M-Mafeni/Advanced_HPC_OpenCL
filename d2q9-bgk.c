@@ -541,7 +541,7 @@ float av_velocity(const t_param params, t_speed_arr* cells, int* obstacles, t_oc
 
   //enqueue kernel
   err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity,
-                               2, NULL, global, local, 0, NULL, NULL);
+                               3, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing av_velocity kernel", __LINE__);
 
   // Wait for kernel to finish
@@ -870,14 +870,18 @@ checkError(err, "creating cells buffer", __LINE__);
   ocl->cell_sums = clCreateBuffer(
   ocl->context, CL_MEM_WRITE_ONLY,
   sizeof(cl_int) * (params->nx/BLOCKSIZE) * (params->ny/BLOCKSIZE), NULL, &err);
+  checkError(err, "creating cell sums buffer", __LINE__);
 
   ocl->totu_sums = clCreateBuffer(
     ocl->context, CL_MEM_WRITE_ONLY,
     sizeof(cl_float) * (params->nx/BLOCKSIZE) * (params->ny/BLOCKSIZE), NULL, &err);
+  checkError(err, "creating totu sums buffer", __LINE__);
+
 
  ocl->av_vels = clCreateBuffer(
    ocl->context, CL_MEM_WRITE_ONLY,
    sizeof(cl_float) * params->maxIters, NULL, &err);
+ checkError(err, "creating av_vels buffer", __LINE__);
 
   return EXIT_SUCCESS;
 }
