@@ -144,7 +144,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n, t_ocl ocl,const t_param params);
+float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n, t_ocl* ocl,const t_param params);
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
@@ -266,7 +266,7 @@ checkError(err, "writing cellsSE data", __LINE__);
   {
 
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
-    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE),ocl,params);
+    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE),&ocl,params);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -391,24 +391,24 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 
   return EXIT_SUCCESS;
 }
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl ocl,const t_param params){
+float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params){
     cl_int err;
-    err = clSetKernelArg(ocl.reduce, 0, sizeof(cl_mem), &ocl.cell_sums);
+    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->cell_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
 
-    err = clSetKernelArg(ocl.reduce, 1, sizeof(cl_mem), &ocl.totu_sums);
+    err = clSetKernelArg(ocl->reduce, 1, sizeof(cl_mem), &ocl->totu_sums);
     checkError(err, "setting reduce arg 1", __LINE__);
 
-    err = clSetKernelArg(ocl.reduce, 2, sizeof(cl_mem), &ocl.av_vels);
+    err = clSetKernelArg(ocl->reduce, 2, sizeof(cl_mem), &ocl->av_vels);
     checkError(err, "setting reduce arg 2", __LINE__);
 
-    err = clSetKernelArg(ocl.reduce, 3, sizeof(cl_int), &tt);
+    err = clSetKernelArg(ocl->reduce, 3, sizeof(cl_int), &tt);
     checkError(err, "setting reduce arg 3", __LINE__);
 
-    err = clSetKernelArg(ocl.reduce, 4, sizeof(cl_int), &n);
+    err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &n);
     checkError(err, "setting reduce arg 4", __LINE__);
 
-    err = clEnqueueTask(ocl.queue, ocl.reduce,
+    err = clEnqueueTask(ocl->queue, ocl->reduce,
                                  0, NULL, NULL);
     checkError(err, "enqueueing reduce kernel", __LINE__);
 
