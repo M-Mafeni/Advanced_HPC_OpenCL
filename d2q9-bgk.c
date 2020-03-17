@@ -347,7 +347,11 @@ float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells,
 {
 
   accelerate_flow(params, cells, obstacles, &ocl);
-  return collision(params, cells, tmp_cells, obstacles, &ocl,cell_sums,totu_sums);
+  collision(params, cells, tmp_cells, obstacles, &ocl,cell_sums,totu_sums);
+  cl_int err;
+  err = clFlush(ocl.queue);
+  checkError(err, "flushing queue", __LINE__);
+  return 0;
 }
 
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl)
@@ -385,15 +389,10 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
                                1, NULL, global, NULL, 0, NULL, NULL);
   checkError(err, "enqueueing accelerate_flow kernel", __LINE__);
 
-  // Wait for kernel to finish
-  err = clFinish(ocl->queue);
-  checkError(err, "waiting for accelerate_flow kernel", __LINE__);
-
   return EXIT_SUCCESS;
 }
 float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl ocl,const t_param params){
     cl_int err;
-    // size_t global[1] = {1};
     err = clSetKernelArg(ocl.reduce, 0, sizeof(cl_mem), &ocl.cell_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
 
@@ -412,10 +411,6 @@ float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl o
     err = clEnqueueTask(ocl.queue, ocl.reduce,
                                  0, NULL, NULL);
     checkError(err, "enqueueing reduce kernel", __LINE__);
-
-    // Wait for kernel to finish
-    err = clFinish(ocl.queue);
-    checkError(err, "waiting for reduce kernel", __LINE__);
 
     return 0;
 }
@@ -473,10 +468,6 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     err = clEnqueueNDRangeKernel(ocl->queue, ocl->collision,
                                  2, NULL, global, local, 0, NULL, NULL);
     checkError(err, "enqueueing collision kernel", __LINE__);
-
-    // Wait for kernel to finish
-    err = clFinish(ocl->queue);
-    checkError(err, "waiting for collision kernel", __LINE__);
 
     return 0;
 }
