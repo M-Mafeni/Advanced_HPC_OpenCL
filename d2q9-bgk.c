@@ -273,6 +273,8 @@ checkError(err, "writing cellsSE data", __LINE__);
     printf("tot density: %.12E\n", total_density(params, cells));
 #endif
   }
+  err = clFlush(ocl.queue);
+  checkError(err, "flushing queue", __LINE__);
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.av_vels, CL_TRUE, 0,
       sizeof(cl_float) * params.maxIters, av_vels, 0, NULL, NULL);
@@ -348,9 +350,6 @@ float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells,
 
   accelerate_flow(params, cells, obstacles, &ocl);
   collision(params, cells, tmp_cells, obstacles, &ocl,cell_sums,totu_sums);
-  cl_int err;
-  err = clFlush(ocl.queue);
-  checkError(err, "flushing queue", __LINE__);
   return 0;
 }
 
@@ -393,6 +392,7 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 }
 float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params){
     cl_int err;
+    size_t global[1] = {1};
     err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->cell_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
 
