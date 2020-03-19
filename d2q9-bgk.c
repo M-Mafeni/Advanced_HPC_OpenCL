@@ -67,7 +67,9 @@
 #define FINALSTATEFILE  "final_state.dat"
 #define AVVELSFILE      "av_vels.dat"
 #define OCLFILE         "kernels.cl"
-#define BLOCKSIZE      16
+#define BLOCKSIZE_X      16
+#define BLOCKSIZE_Y     1
+
 
 /* struct to hold the parameter values */
 typedef struct
@@ -203,10 +205,10 @@ int main(int argc, char* argv[])
 
   /* initialise our data structures and load values from file */
   initialise(paramfile, obstaclefile, &params, &cells, &tmp_cells, &obstacles, &av_vels, &ocl);
-  int* cell_sums = malloc(sizeof(int) * (params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE));
+  int* cell_sums = malloc(sizeof(int) * (params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y));
   // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
 
-  float* totu_sums = malloc(sizeof(float) * (params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE));
+  float* totu_sums = malloc(sizeof(float) * (params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y));
 
   /* iterate for maxIters timesteps */
   gettimeofday(&timstr, NULL);
@@ -266,7 +268,7 @@ checkError(err, "writing cellsSE data", __LINE__);
   {
 
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
-    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE),&ocl,params);
+    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y),&ocl,params);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -424,7 +426,7 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     cl_int err;
 
     size_t global[2] = {params.nx, params.ny};
-    size_t local[2] = {BLOCKSIZE, BLOCKSIZE};
+    size_t local[2] = {BLOCKSIZE_X, BLOCKSIZE_Y};
 
     err = clSetKernelArg(ocl->collision, 0, sizeof(cl_mem), &ocl->speeds0);
     checkError(err, "setting collision arg 0", __LINE__);
@@ -863,12 +865,12 @@ checkError(err, "creating cells buffer", __LINE__);
 
   ocl->cell_sums = clCreateBuffer(
   ocl->context, CL_MEM_WRITE_ONLY,
-  sizeof(cl_int) * (params->nx/BLOCKSIZE) * (params->ny/BLOCKSIZE), NULL, &err);
+  sizeof(cl_int) * (params->nx/BLOCKSIZE_X) * (params->ny/BLOCKSIZE_Y), NULL, &err);
   checkError(err, "creating cell sums buffer", __LINE__);
 
   ocl->totu_sums = clCreateBuffer(
     ocl->context, CL_MEM_WRITE_ONLY,
-    sizeof(cl_float) * (params->nx/BLOCKSIZE) * (params->ny/BLOCKSIZE), NULL, &err);
+    sizeof(cl_float) * (params->nx/BLOCKSIZE_X) * (params->ny/BLOCKSIZE_Y), NULL, &err);
   checkError(err, "creating totu sums buffer", __LINE__);
 
 
