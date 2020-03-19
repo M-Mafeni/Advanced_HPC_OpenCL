@@ -212,17 +212,17 @@ kernel void collision( global float* speeds0,
                                      - d);
 
     /* don't consider occupied cells */
-   speeds0[index] = (isObstacle) ? speeds[0] : speeds[0] + omega * (d_equ[0] - speeds[0]);
-   speedsE[index] = (isObstacle) ? speeds[3] : speeds[1] + omega * (d_equ[1] - speeds[1]);
-   speedsN[index] = (isObstacle) ? speeds[4] : speeds[2] + omega * (d_equ[2] - speeds[2]);
-   speedsW[index] = (isObstacle) ? speeds[1] : speeds[3] + omega * (d_equ[3] - speeds[3]);
-   speedsS[index] = (isObstacle) ? speeds[2] : speeds[4] + omega * (d_equ[4] - speeds[4]);
-   speedsNE[index] = (isObstacle) ? speeds[7] : speeds[5] + omega * (d_equ[5] - speeds[5]);
-   speedsNW[index] = (isObstacle) ? speeds[8] : speeds[6] + omega * (d_equ[6] - speeds[6]);
-   speedsSW[index] = (isObstacle) ? speeds[5] : speeds[7] + omega * (d_equ[7] - speeds[7]);
-   speedsSE[index] = (isObstacle) ? speeds[6] : speeds[8] + omega * (d_equ[8] - speeds[8]);
-    tot_u = (!isObstacle) * sqrt(u_sq) ;
-    tot_cells = (!isObstacle);
+   speeds0[index] = (obstacles[index]) ? speeds[0] : speeds[0] + omega * (d_equ[0] - speeds[0]);
+   speedsE[index] = (obstacles[index]) ? speeds[3] : speeds[1] + omega * (d_equ[1] - speeds[1]);
+   speedsN[index] = (obstacles[index]) ? speeds[4] : speeds[2] + omega * (d_equ[2] - speeds[2]);
+   speedsW[index] = (obstacles[index]) ? speeds[1] : speeds[3] + omega * (d_equ[3] - speeds[3]);
+   speedsS[index] = (obstacles[index]) ? speeds[2] : speeds[4] + omega * (d_equ[4] - speeds[4]);
+   speedsNE[index] = (obstacles[index]) ? speeds[7] : speeds[5] + omega * (d_equ[5] - speeds[5]);
+   speedsNW[index] = (obstacles[index]) ? speeds[8] : speeds[6] + omega * (d_equ[6] - speeds[6]);
+   speedsSW[index] = (obstacles[index]) ? speeds[5] : speeds[7] + omega * (d_equ[7] - speeds[7]);
+   speedsSE[index] = (obstacles[index]) ? speeds[6] : speeds[8] + omega * (d_equ[8] - speeds[8]);
+    tot_u = (!obstacles[index]) * sqrt(u_sq) ;
+    tot_cells = (!obstacles[index]);
 
     int local_id = lx + ly * blksize;
     local_cell_sums[local_id] = tot_cells;
