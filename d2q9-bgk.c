@@ -67,8 +67,8 @@
 #define FINALSTATEFILE  "final_state.dat"
 #define AVVELSFILE      "av_vels.dat"
 #define OCLFILE         "kernels.cl"
-#define BLOCKSIZE_X      16
-#define BLOCKSIZE_Y     1
+#define BLOCKSIZE_X      128
+#define BLOCKSIZE_Y     8
 
 
 /* struct to hold the parameter values */
@@ -146,7 +146,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n, t_ocl* ocl,const t_param params);
+float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
@@ -192,6 +192,8 @@ int main(int argc, char* argv[])
   double usrtim;                /* floating point number to record elapsed user CPU time */
   double systim;                /* floating point number to record elapsed system CPU time */
 
+
+
   /* parse the command line */
   if (argc != 3)
   {
@@ -203,8 +205,16 @@ int main(int argc, char* argv[])
     obstaclefile = argv[2];
   }
 
+
   /* initialise our data structures and load values from file */
   initialise(paramfile, obstaclefile, &params, &cells, &tmp_cells, &obstacles, &av_vels, &ocl);
+  int tot_cells = 0;
+  for (size_t jj = 0; jj < params.ny; jj++) {
+      for (size_t ii = 0; ii < params.nx; ii++) {
+          int index = ii+jj*params.nx;
+          tot_cells += !obstacles[index];
+      }
+  }
   int* cell_sums = malloc(sizeof(int) * (params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y));
   // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
 
@@ -263,19 +273,20 @@ int main(int argc, char* argv[])
       ocl.queue, ocl.speedsSE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
 checkError(err, "writing cellsSE data", __LINE__);
+printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) );
 
   for (int tt = 0; tt < params.maxIters; tt++)
   {
 
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
-    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y),&ocl,params);
+    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y),&ocl,params,tot_cells);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
     printf("tot density: %.12E\n", total_density(params, cells));
 #endif
   }
-  err = clFlush(ocl.queue);
+  err = clFinish(ocl.queue);
   checkError(err, "flushing queue", __LINE__);
   err = clEnqueueReadBuffer(
       ocl.queue, ocl.av_vels, CL_TRUE, 0,
@@ -392,30 +403,33 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 
   return EXIT_SUCCESS;
 }
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params){
+float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
     cl_int err;
-    // int num_groups = (params.nx/BLOCKSIZE) * (params.ny/BLOCKSIZE);
-    // size_t global[1] = {1};
-    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->cell_sums);
+    // size_t global[1] = {n};
+    // err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->cell_sums);
+    // checkError(err, "setting reduce arg 0", __LINE__);
+
+    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->totu_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
 
-    err = clSetKernelArg(ocl->reduce, 1, sizeof(cl_mem), &ocl->totu_sums);
+    err = clSetKernelArg(ocl->reduce, 1, sizeof(cl_mem), &ocl->av_vels);
     checkError(err, "setting reduce arg 1", __LINE__);
 
-    err = clSetKernelArg(ocl->reduce, 2, sizeof(cl_mem), &ocl->av_vels);
+    err = clSetKernelArg(ocl->reduce, 2, sizeof(cl_int), &tt);
     checkError(err, "setting reduce arg 2", __LINE__);
 
-    err = clSetKernelArg(ocl->reduce, 3, sizeof(cl_int), &tt);
+    err = clSetKernelArg(ocl->reduce, 3, sizeof(cl_int), &n);
     checkError(err, "setting reduce arg 3", __LINE__);
 
-    err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &n);
+    // printf("%d\n",tot_cells );
+    err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &tot_cells);
     checkError(err, "setting reduce arg 4", __LINE__);
 
     err = clEnqueueTask(ocl->queue, ocl->reduce,
                                  0, NULL, NULL);
     // err = clEnqueueNDRangeKernel(ocl->queue, ocl->reduce,
-    //                              1, NULL, global, NULL, 0, NULL, NULL);
-    checkError(err, "enqueueing reduce kernel", __LINE__);
+    //                              1, NULL, global, global, 0, NULL, NULL);
+    // checkError(err, "enqueueing reduce kernel", __LINE__);
 
     return 0;
 }
@@ -453,22 +467,18 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     checkError(err, "setting collision arg 10", __LINE__);
     err = clSetKernelArg(ocl->collision, 11, sizeof(cl_float), &params.omega);
     checkError(err, "setting collision arg 11", __LINE__);
-    err = clSetKernelArg(ocl->collision, 12, sizeof(cl_int) * local[0] * local[1], NULL);
+
+    err = clSetKernelArg(ocl->collision, 12, sizeof(cl_float) * local[0] * local[1] , NULL);
     checkError(err, "setting collision arg 12", __LINE__);
-    err = clSetKernelArg(ocl->collision, 13, sizeof(cl_float) * local[0] * local[1] , NULL);
+
+    err = clSetKernelArg(ocl->collision, 13, sizeof(cl_mem) , &ocl->totu_sums);
     checkError(err, "setting collision arg 13", __LINE__);
 
-    err = clSetKernelArg(ocl->collision, 14, sizeof(cl_mem) , &ocl->cell_sums);
+    err = clSetKernelArg(ocl->collision, 14, sizeof(cl_int) , &local[0]);
     checkError(err, "setting collision arg 14", __LINE__);
 
-    err = clSetKernelArg(ocl->collision, 15, sizeof(cl_mem) , &ocl->totu_sums);
+    err = clSetKernelArg(ocl->collision, 15, sizeof(cl_int) , &params.ny);
     checkError(err, "setting collision arg 15", __LINE__);
-
-    err = clSetKernelArg(ocl->collision, 16, sizeof(cl_int) , &local[0]);
-    checkError(err, "setting collision arg 16", __LINE__);
-
-    err = clSetKernelArg(ocl->collision, 17, sizeof(cl_int) , &params.ny);
-    checkError(err, "setting collision arg 17", __LINE__);
 
     err = clEnqueueNDRangeKernel(ocl->queue, ocl->collision,
                                  2, NULL, global, local, 0, NULL, NULL);

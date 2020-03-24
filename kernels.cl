@@ -60,30 +60,15 @@ speedsSW[index] -= w2;
 
 }
 
-kernel void reduce(global int* cell_sums, global float* totu_sums, global float* av_vels,int tt,int N){
-    int tot_cells = 0;
+kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,int tot_cells){
+    // int tot_cells = 0;
     float tot_u = 0;
     for(int i = 0;  i < N; i++)
     {
-        tot_cells += cell_sums[i];
+        // tot_cells += cell_sums[i];
         tot_u += totu_sums[i];
     }
-        av_vels[tt] = tot_u/tot_cells;
-    // int id = get_global_id(0);
-    // for(int offset = 1; offset < N; offset *= 2){
-    //     int mask = 2*offset - 1;
-    //     barrier(CLK_GLOBAL_MEM_FENCE);
-    //     int x = (id&mask);
-    //     int a = (x==0) ?cell_sums[id+ offset] : 0;
-    //     float b = (x==0)?totu_sums[id+ offset] : 0.f;
-    //     cell_sums[id] += a;
-    //     totu_sums[id] += b;
-    // }
-    // barrier(CLK_GLOBAL_MEM_FENCE);
-    // if(id == 0)
-    // {
-    //     av_vels[tt] = totu_sums[0]/(float) cell_sums[0];
-    // }
+    av_vels[tt] = tot_u/(float)tot_cells;
 }
 kernel void collision( global float* speeds0,
                       global float* speedsN,
@@ -96,9 +81,7 @@ kernel void collision( global float* speeds0,
                       global float* speedsSE,
                       const global int* obstacles,
                       const int nx, const float omega,
-                      local float* local_cell_sums,
                       local float* local_totu_sums,
-                      global int* global_cell_sums,
                       global float* global_totu_sums,
                       const int blksize,const int ny)
 {
@@ -107,7 +90,6 @@ kernel void collision( global float* speeds0,
     int jj = get_global_id(1);
     int lx = get_local_id(0);
     int ly = get_local_id(1);
-    int tot_cells = 0;
     float tot_u = 0.0f;
     const float c_sq = 1.f / 3.f; /* square of speed of sound */
     const float w0 = 4.f / 9.f;  /* weighting factor */
@@ -227,10 +209,8 @@ kernel void collision( global float* speeds0,
    speedsSW[index] = (obstacles[index]) ? speeds[5] : speeds[7] + omega * (d_equ[7] - speeds[7]);
    speedsSE[index] = (obstacles[index]) ? speeds[6] : speeds[8] + omega * (d_equ[8] - speeds[8]);
     tot_u = (!obstacles[index]) * sqrt(u_sq) ;
-    tot_cells = (!obstacles[index]);
 
     int local_id = lx + ly * blksize;
-    local_cell_sums[local_id] = tot_cells;
     local_totu_sums[local_id] = tot_u;
 
     int gx = get_group_id(0);
@@ -245,15 +225,12 @@ kernel void collision( global float* speeds0,
         int mask = 2*offset -1;
         barrier(CLK_LOCAL_MEM_FENCE);
         int x = (local_id&mask);
-        int a = (x==0) ?local_cell_sums[local_id+ offset] : 0 ;
         float b = (x==0)?local_totu_sums[local_id+ offset] : 0.f;
-        local_cell_sums[local_id] += a;
         local_totu_sums[local_id] += b;
     }
     barrier(CLK_LOCAL_MEM_FENCE);
     if(local_id == 0)
     {
-        global_cell_sums[group_id] = local_cell_sums[0];
         global_totu_sums[group_id] = local_totu_sums[0];
     }
 }
