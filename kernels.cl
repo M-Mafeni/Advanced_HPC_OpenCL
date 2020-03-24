@@ -61,11 +61,9 @@ speedsSW[index] -= w2;
 }
 
 kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,int tot_cells){
-    // int tot_cells = 0;
     float tot_u = 0;
     for(int i = 0;  i < N; i++)
     {
-        // tot_cells += cell_sums[i];
         tot_u += totu_sums[i];
     }
     av_vels[tt] = tot_u/(float)tot_cells;
@@ -246,12 +244,9 @@ kernel void av_velocity(global float* speeds0,
             global float* speedsSE,
             global int* obstacles,
             int nx,
-            local float* local_cell_sums,
             local float* local_totu_sums,
-            global int* global_cell_sums,
             global float* global_totu_sums,
-            const int blksize
-            )
+            const int blksize)
 {
     int ii = get_global_id(0);
     int jj = get_global_id(1);
@@ -299,7 +294,7 @@ kernel void av_velocity(global float* speeds0,
        ++tot_cells;
     }
     int local_id = lx + ly * blksize;
-    local_cell_sums[local_id] = tot_cells;
+    // local_cell_sums[local_id] = tot_cells;
     local_totu_sums[local_id] = tot_u;
 
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -307,16 +302,16 @@ kernel void av_velocity(global float* speeds0,
     int gy = get_group_id(1);
     int group_id = gx + gy * (nx/blksize);
 
-    int cell_sum = 0;
+    // int cell_sum = 0;
     float totu_sum;
     int num_wrk_items = get_local_size(0) * get_local_size(1);
     if(local_id == 0){
         totu_sum = 0;
         for(int i = 0; i < num_wrk_items; i++){
-            cell_sum += local_cell_sums[i];
+            // cell_sum += local_cell_sums[i];
             totu_sum += local_totu_sums[i];
         }
-        global_cell_sums[group_id] = cell_sum;
+        // global_cell_sums[group_id] = cell_sum;
         global_totu_sums[group_id] = totu_sum;
     }
 }
