@@ -60,6 +60,29 @@ speedsSW[index] -= w2;
 
 }
 
+kernel void partial_reduce(global float* totu_sums,global float* fin_totu_sums,local float* local_totu_sums ){
+    int global_id = get_global_id(0);
+    int local_id = get_local_id(0);
+    // printf("%d \n",local_id);
+    local_totu_sums[local_id] = totu_sums[global_id];
+    int num_wrk_items = get_local_size(0);
+    for(int offset =  1; offset < num_wrk_items; offset*= 2)
+    {
+        int mask = 2*offset -1;
+        barrier(CLK_LOCAL_MEM_FENCE);
+        int x = (local_id&mask);
+        float b = (x==0)?local_totu_sums[local_id+ offset] : 0.f;
+        local_totu_sums[local_id] += b;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+    int group_id = get_group_id(0);
+    if(local_id == 0)
+    {
+        fin_totu_sums[group_id] = local_totu_sums[0];
+        // printf("%f \n",fin_totu_sums[group_id]);
+    }
+}
+
 kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,int tot_cells){
     float tot_u = 0;
     for(int i = 0;  i < N; i++)

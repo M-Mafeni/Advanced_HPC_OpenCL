@@ -69,6 +69,7 @@
 #define OCLFILE         "kernels.cl"
 #define BLOCKSIZE_X      128
 #define BLOCKSIZE_Y     8
+#define FIN_SIZE     16
 
 
 /* struct to hold the parameter values */
@@ -94,6 +95,7 @@ typedef struct
   cl_kernel  accelerate_flow;
   cl_kernel collision;
   cl_kernel av_velocity;
+  cl_kernel partial_reduce;
   cl_kernel reduce;
 
   cl_mem obstacles;
@@ -108,6 +110,7 @@ typedef struct
   cl_mem speedsSE;
 
   cl_mem totu_sums;
+  cl_mem fin_totu_sums;
   cl_mem av_vels;
 } t_ocl;
 
@@ -404,21 +407,30 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 }
 
 float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
+
+    //CALL partial_reduce
     cl_int err;
-    // size_t global[1] = {n};
-
-    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->totu_sums);
+    size_t global[1] = {n};
+    size_t local[1] = {FIN_SIZE};
+    err = clSetKernelArg(ocl->partial_reduce, 0, sizeof(cl_mem), &ocl->totu_sums);
+    checkError(err, "setting partial_reduce arg 0", __LINE__);
+    err = clSetKernelArg(ocl->partial_reduce, 1, sizeof(cl_mem), &ocl->fin_totu_sums);
+    checkError(err, "setting partial_reduce arg 1", __LINE__);
+    err = clSetKernelArg(ocl->partial_reduce, 2, local[0], NULL);
+    checkError(err, "setting partial_reduce arg 2", __LINE__);
+    err = clEnqueueNDRangeKernel(ocl->queue, ocl->partial_reduce,
+                                 1, NULL, global, local, 0, NULL, NULL);
+    checkError(err, "enqueueing partial_reduce kernel", __LINE__);
+    //CALL reduce kernel
+    int fin_groups = n/4;
+    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->fin_totu_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
-
     err = clSetKernelArg(ocl->reduce, 1, sizeof(cl_mem), &ocl->av_vels);
     checkError(err, "setting reduce arg 1", __LINE__);
-
     err = clSetKernelArg(ocl->reduce, 2, sizeof(cl_int), &tt);
     checkError(err, "setting reduce arg 2", __LINE__);
-
-    err = clSetKernelArg(ocl->reduce, 3, sizeof(cl_int), &n);
+    err = clSetKernelArg(ocl->reduce, 3, sizeof(cl_int), &fin_groups);
     checkError(err, "setting reduce arg 3", __LINE__);
-
     // printf("%d\n",tot_cells );
     err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &tot_cells);
     checkError(err, "setting reduce arg 4", __LINE__);
@@ -427,7 +439,7 @@ float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* 
                                  0, NULL, NULL);
     // err = clEnqueueNDRangeKernel(ocl->queue, ocl->reduce,
     //                              1, NULL, global, global, 0, NULL, NULL);
-    // checkError(err, "enqueueing reduce kernel", __LINE__);
+    checkError(err, "enqueueing reduce kernel", __LINE__);
 
     return 0;
 }
@@ -809,6 +821,8 @@ int initialise(const char* paramfile, const char* obstaclefile,
   checkError(err, "creating av_velocity kernel", __LINE__);
   ocl->reduce = clCreateKernel(ocl->program,"reduce",&err);
   checkError(err, "creating reduce kernel", __LINE__);
+  ocl->partial_reduce = clCreateKernel(ocl->program,"partial_reduce",&err);
+  checkError(err, "creating partial_reduce kernel", __LINE__);
 
   // Allocate OpenCL buffers
 ocl->speeds0 =clCreateBuffer(
@@ -866,6 +880,11 @@ checkError(err, "creating cells buffer", __LINE__);
     ocl->context, CL_MEM_WRITE_ONLY,
     sizeof(cl_float) * (params->nx/BLOCKSIZE_X) * (params->ny/BLOCKSIZE_Y), NULL, &err);
   checkError(err, "creating totu sums buffer", __LINE__);
+
+  ocl->fin_totu_sums = clCreateBuffer(
+    ocl->context, CL_MEM_WRITE_ONLY,
+    (sizeof(cl_float) * (params->nx/BLOCKSIZE_X) * (params->ny/BLOCKSIZE_Y))/FIN_SIZE, NULL, &err);
+  checkError(err, "creating fin totu sums buffer", __LINE__);
 
 
  ocl->av_vels = clCreateBuffer(
