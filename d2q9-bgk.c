@@ -283,8 +283,8 @@ int main(int argc, char* argv[])
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
     while(n >= 1){
         partial_reduce(n,&ocl,ocl.totu_sums,ocl.fin_totu_sums,av_vels,tt,tot_cells);
-        partial_reduce(n/2,&ocl,ocl.fin_totu_sums,ocl.totu_sums,av_vels,tt,tot_cells);
-        n = n/4;
+        partial_reduce(n/FIN_SIZE,&ocl,ocl.fin_totu_sums,ocl.totu_sums,av_vels,tt,tot_cells);
+        n = n/(FIN_SIZE*2);
     }
     // partial_reduce(n,&ocl,ocl.totu_sums,ocl.fin_totu_sums);
     // reduce(av_vels,tt,n,&ocl,params,tot_cells);
@@ -413,12 +413,13 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 }
 
 float partial_reduce(int n,t_ocl* ocl,cl_mem input,cl_mem output,float* av_vels,int tt,int tot_cells){
-    if(n< 1) return 0;
-    if(n==1){
+    if(n < 1) return 0;
+    if(n< FIN_SIZE){
         //copy into av_vels[tt]
         reduce(av_vels,tt,n,ocl,tot_cells,input);
         return 0;
     }
+    // printf("%d\n",n);
     cl_int err;
     size_t global[1] = {n};
     size_t local[1] = {FIN_SIZE};
