@@ -148,8 +148,8 @@ int initialise(const char* paramfile, const char* obstaclefile,
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
-float partial_reduce(float* totu_sums,int n,t_ocl* ocl);
-float reduce(float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
+float partial_reduce(int n,t_ocl* ocl);
+float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
@@ -281,8 +281,8 @@ int main(int argc, char* argv[])
   for (int tt = 0; tt < params.maxIters; tt++)
   {
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
-    partial_reduce(totu_sums,n,&ocl);
-    reduce(totu_sums,av_vels,tt,n,&ocl,params,tot_cells);
+    partial_reduce(n,&ocl);
+    reduce(av_vels,tt,n,&ocl,params,tot_cells);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -407,7 +407,7 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
   return EXIT_SUCCESS;
 }
 
-float partial_reduce(float* totu_sums,int n,t_ocl* ocl){
+float partial_reduce(int n,t_ocl* ocl){
     cl_int err;
     size_t global[1] = {n};
     size_t local[1] = {FIN_SIZE};
@@ -422,7 +422,7 @@ float partial_reduce(float* totu_sums,int n,t_ocl* ocl){
     checkError(err, "enqueueing partial_reduce kernel", __LINE__);
     return 0;
 }
-float reduce(float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
+float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
     cl_int err;
     //CALL reduce kernel
     int fin_groups = n/FIN_SIZE;
@@ -886,7 +886,7 @@ checkError(err, "creating cells buffer", __LINE__);
 
   ocl->fin_totu_sums = clCreateBuffer(
     ocl->context, CL_MEM_WRITE_ONLY,
-    (sizeof(cl_float) * (params->nx/BLOCKSIZE_X) * (params->ny/BLOCKSIZE_Y))/FIN_SIZE, NULL, &err);
+    (sizeof(cl_float) * (params->nx/BLOCKSIZE_X) * (params->ny/BLOCKSIZE_Y)), NULL, &err);
   checkError(err, "creating fin totu sums buffer", __LINE__);
 
 
