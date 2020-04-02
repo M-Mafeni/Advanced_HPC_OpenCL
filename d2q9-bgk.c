@@ -69,7 +69,7 @@
 #define OCLFILE         "kernels.cl"
 #define BLOCKSIZE_X      128
 #define BLOCKSIZE_Y     8
-#define FIN_SIZE     16
+#define FIN_SIZE     2
 
 
 /* struct to hold the parameter values */
@@ -148,7 +148,8 @@ int initialise(const char* paramfile, const char* obstaclefile,
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
+float partial_reduce(float* totu_sums,int n,t_ocl* ocl);
+float reduce(float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
@@ -274,14 +275,14 @@ int main(int argc, char* argv[])
   err = clEnqueueWriteBuffer(
       ocl.queue, ocl.speedsSE, CL_TRUE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
-checkError(err, "writing cellsSE data", __LINE__);
-printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) );
-
+  checkError(err, "writing cellsSE data", __LINE__);
+  printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) );
+  int n =(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y);
   for (int tt = 0; tt < params.maxIters; tt++)
   {
-
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
-    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y),&ocl,params,tot_cells);
+    partial_reduce(totu_sums,n,&ocl);
+    reduce(totu_sums,av_vels,tt,n,&ocl,params,tot_cells);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -406,9 +407,7 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
   return EXIT_SUCCESS;
 }
 
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
-
-    //CALL partial_reduce
+float partial_reduce(float* totu_sums,int n,t_ocl* ocl){
     cl_int err;
     size_t global[1] = {n};
     size_t local[1] = {FIN_SIZE};
@@ -421,8 +420,12 @@ float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* 
     err = clEnqueueNDRangeKernel(ocl->queue, ocl->partial_reduce,
                                  1, NULL, global, local, 0, NULL, NULL);
     checkError(err, "enqueueing partial_reduce kernel", __LINE__);
+    return 0;
+}
+float reduce(float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
+    cl_int err;
     //CALL reduce kernel
-    int fin_groups = n/4;
+    int fin_groups = n/FIN_SIZE;
     err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->fin_totu_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
     err = clSetKernelArg(ocl->reduce, 1, sizeof(cl_mem), &ocl->av_vels);

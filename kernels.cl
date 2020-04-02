@@ -59,7 +59,7 @@ speedsNW[index] -= w2;
 speedsSW[index] -= w2;
 
 }
-
+// totu_sums = n, fin_totu_sums = n/2, local_totu_sums = 2
 kernel void partial_reduce(global float* totu_sums,global float* fin_totu_sums,local float* local_totu_sums ){
     int global_id = get_global_id(0);
     int local_id = get_local_id(0);
