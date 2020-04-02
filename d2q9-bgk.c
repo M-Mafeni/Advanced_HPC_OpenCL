@@ -148,8 +148,8 @@ int initialise(const char* paramfile, const char* obstaclefile,
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
-float partial_reduce(int n,t_ocl* ocl);
-float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
+float partial_reduce(int n,t_ocl* ocl,cl_mem input,cl_mem output,float* av_vels,int tt,int tot_cells);
+float reduce(float* av_vels,int tt,int n,t_ocl* ocl,int tot_cells,cl_mem output);
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int* cell_sums,float* totu_sums);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
@@ -277,12 +277,17 @@ int main(int argc, char* argv[])
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
   checkError(err, "writing cellsSE data", __LINE__);
   printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) );
-  int n =(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y);
   for (int tt = 0; tt < params.maxIters; tt++)
   {
+    int n =(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y);
     timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
-    partial_reduce(n,&ocl);
-    reduce(av_vels,tt,n,&ocl,params,tot_cells);
+    while(n >= 1){
+        partial_reduce(n,&ocl,ocl.totu_sums,ocl.fin_totu_sums,av_vels,tt,tot_cells);
+        partial_reduce(n/2,&ocl,ocl.fin_totu_sums,ocl.totu_sums,av_vels,tt,tot_cells);
+        n = n/4;
+    }
+    // partial_reduce(n,&ocl,ocl.totu_sums,ocl.fin_totu_sums);
+    // reduce(av_vels,tt,n,&ocl,params,tot_cells);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -407,13 +412,19 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
   return EXIT_SUCCESS;
 }
 
-float partial_reduce(int n,t_ocl* ocl){
+float partial_reduce(int n,t_ocl* ocl,cl_mem input,cl_mem output,float* av_vels,int tt,int tot_cells){
+    if(n< 1) return 0;
+    if(n==1){
+        //copy into av_vels[tt]
+        reduce(av_vels,tt,n,ocl,tot_cells,input);
+        return 0;
+    }
     cl_int err;
     size_t global[1] = {n};
     size_t local[1] = {FIN_SIZE};
-    err = clSetKernelArg(ocl->partial_reduce, 0, sizeof(cl_mem), &ocl->totu_sums);
+    err = clSetKernelArg(ocl->partial_reduce, 0, sizeof(cl_mem), &input);
     checkError(err, "setting partial_reduce arg 0", __LINE__);
-    err = clSetKernelArg(ocl->partial_reduce, 1, sizeof(cl_mem), &ocl->fin_totu_sums);
+    err = clSetKernelArg(ocl->partial_reduce, 1, sizeof(cl_mem), &output);
     checkError(err, "setting partial_reduce arg 1", __LINE__);
     err = clSetKernelArg(ocl->partial_reduce, 2, local[0], NULL);
     checkError(err, "setting partial_reduce arg 2", __LINE__);
@@ -422,11 +433,11 @@ float partial_reduce(int n,t_ocl* ocl){
     checkError(err, "enqueueing partial_reduce kernel", __LINE__);
     return 0;
 }
-float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
+float reduce(float* av_vels,int tt,int n,t_ocl* ocl,int tot_cells,cl_mem output){
     cl_int err;
     //CALL reduce kernel
     int fin_groups = n/FIN_SIZE;
-    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->fin_totu_sums);
+    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &output);
     checkError(err, "setting reduce arg 0", __LINE__);
     err = clSetKernelArg(ocl->reduce, 1, sizeof(cl_mem), &ocl->av_vels);
     checkError(err, "setting reduce arg 1", __LINE__);

@@ -84,12 +84,13 @@ kernel void partial_reduce(global float* totu_sums,global float* fin_totu_sums,l
 }
 
 kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,int tot_cells){
-    float tot_u = 0;
-    for(int i = 0;  i < N; i++)
-    {
-        tot_u += totu_sums[i];
-    }
-    av_vels[tt] = tot_u/(float)tot_cells;
+    // float tot_u = 0;
+    // for(int i = 0;  i < N; i++)
+    // {
+    //     tot_u += totu_sums[i];
+    // }
+    // av_vels[tt] = tot_u/(float)tot_cells;
+    av_vels[tt] = totu_sums[0]/(float) tot_cells;
 }
 kernel void collision( global float* speeds0,
                       global float* speedsN,
