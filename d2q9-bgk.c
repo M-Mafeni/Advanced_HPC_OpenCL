@@ -784,7 +784,7 @@ int initialise(const char* paramfile, const char* obstaclefile,
   checkError(err, "creating program", __LINE__);
 
   // Build OpenCL program
-  err = clBuildProgram(ocl->program, 1, &ocl->device, " -cl-mad-enable -cl-fast-relaxed-math", NULL, NULL);
+  err = clBuildProgram(ocl->program, 1, &ocl->device, "-cl-fast-relaxed-math", NULL, NULL);
   if (err == CL_BUILD_PROGRAM_FAILURE)
   {
     size_t sz;

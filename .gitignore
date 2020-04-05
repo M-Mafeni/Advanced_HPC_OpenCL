@@ -5,3 +5,9 @@ d2q9-bgk.out
 final_state.dat
 av_vels.dat
 final_state.png
+
+extension_mpi/d2q9-bgk
+extension_mpi/d2q9-bgk.out
+extension_mpi/final_state.dat
+extension_mpi/av_vels.dat
+extension_mpi/final_state.png
