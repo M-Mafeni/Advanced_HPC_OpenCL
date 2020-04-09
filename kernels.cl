@@ -61,19 +61,13 @@ speedsSW[index] -= w2;
 }
 
 kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,int tot_cells,local float* local_totu_sums){
-    float tot_u = 0;
 
-    // for(int i = 0;  i < N; i++)
-    // {
-    //     tot_u += totu_sums[i];
-    // }
     int local_id = get_local_id(0);
     int global_id = get_global_id(0);
 
     local_totu_sums[local_id] = totu_sums[global_id];
 
-    int num_wrk_items = get_local_size(0);
-    for(int offset =  1; offset < num_wrk_items; offset*= 2)
+    for(int offset =  1; offset < N; offset*= 2)
     {
         int mask = 2*offset -1;
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -85,7 +79,6 @@ kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,i
     if(local_id == 0){
         av_vels[tt] = local_totu_sums[0]/(float)tot_cells;
     }
-    // av_vels[tt] = tot_u/(float)tot_cells;
 }
 kernel void collision( global float* speeds0,
                       global float* speedsN,

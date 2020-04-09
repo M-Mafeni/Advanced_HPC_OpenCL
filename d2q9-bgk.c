@@ -67,8 +67,8 @@
 #define FINALSTATEFILE  "final_state.dat"
 #define AVVELSFILE      "av_vels.dat"
 #define OCLFILE         "kernels.cl"
-#define BLOCKSIZE_X      128
-#define BLOCKSIZE_Y     8
+#define BLOCKSIZE_X      32
+#define BLOCKSIZE_Y     32
 
 
 /* struct to hold the parameter values */
@@ -143,10 +143,10 @@ int initialise(const char* paramfile, const char* obstaclefile,
 ** timestep calls, in order, the functions:
 ** accelerate_flow(), propagate(), rebound() & collision()
 */
-float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums);
+float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
-float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int* cell_sums,float* totu_sums);
+float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
+float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
 
 /* finalise, including freeing up allocated memory */
@@ -214,10 +214,7 @@ int main(int argc, char* argv[])
           tot_cells += !obstacles[index];
       }
   }
-  int* cell_sums = malloc(sizeof(int) * (params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y));
-  // printf("%d\n", (params.nx/local[0]) * (params.ny/local[1]) );
 
-  float* totu_sums = malloc(sizeof(float) * (params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y));
 
   /* iterate for maxIters timesteps */
   gettimeofday(&timstr, NULL);
@@ -277,8 +274,8 @@ printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) )
   for (int tt = 0; tt < params.maxIters; tt++)
   {
 
-    timestep(params, cells, tmp_cells, obstacles, ocl,cell_sums,totu_sums);
-    reduce(cell_sums,totu_sums,av_vels,tt,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y),&ocl,params,tot_cells);
+    timestep(params, cells, tmp_cells, obstacles, ocl);
+    reduce(av_vels,tt,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y),&ocl,params,tot_cells);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -331,7 +328,7 @@ printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) )
   checkError(err, "reading cellsSW data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsSE, CL_TRUE, 0,
+      ocl.queue, ocl.speedsSE, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
 
   checkError(err, "reading cellsSE data", __LINE__);
@@ -359,11 +356,11 @@ printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) )
   return EXIT_SUCCESS;
 }
 
-float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl,int* cell_sums,float* totu_sums)
+float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl)
 {
 
   accelerate_flow(params, cells, obstacles, &ocl);
-  collision(params, cells, tmp_cells, obstacles, &ocl,cell_sums,totu_sums);
+  collision(params, cells, tmp_cells, obstacles, &ocl);
   return 0;
 }
 
@@ -405,7 +402,7 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
   return EXIT_SUCCESS;
 }
 
-float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
+float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
     cl_int err;
     size_t global[1] = {n};
     //
@@ -435,8 +432,7 @@ float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* 
     return 0;
 }
 
-float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl,
-    int* cell_sums, float* totu_sums)
+float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl)
 {
     cl_int err;
 
