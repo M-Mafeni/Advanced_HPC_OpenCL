@@ -225,51 +225,51 @@ int main(int argc, char* argv[])
 
   // Write obstacles to OpenCL buffer
   err = clEnqueueWriteBuffer(
-    ocl.queue, ocl.obstacles, CL_TRUE, 0,
+    ocl.queue, ocl.obstacles, CL_FALSE, 0,
     sizeof(cl_int) * params.nx * params.ny, obstacles, 0, NULL, NULL);
   checkError(err, "writing obstacles data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speeds0, CL_TRUE, 0,
+      ocl.queue, ocl.speeds0, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speeds0, 0, NULL, NULL);
   checkError(err, "writing cells0 data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsN, CL_TRUE, 0,
+      ocl.queue, ocl.speedsN, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsN, 0, NULL, NULL);
   checkError(err, "writing cellsN data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsS, CL_TRUE, 0,
+      ocl.queue, ocl.speedsS, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsS, 0, NULL, NULL);
   checkError(err, "writing cellsS data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsW, CL_TRUE, 0,
+      ocl.queue, ocl.speedsW, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsW, 0, NULL, NULL);
   checkError(err, "writing cellsW data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsE, CL_TRUE, 0,
+      ocl.queue, ocl.speedsE, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsE, 0, NULL, NULL);
   checkError(err, "writing cellsE data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsNE, CL_TRUE, 0,
+      ocl.queue, ocl.speedsNE, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNE, 0, NULL, NULL);
   checkError(err, "writing cellsNE data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsNW, CL_TRUE, 0,
+      ocl.queue, ocl.speedsNW, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNW, 0, NULL, NULL);
   checkError(err, "writing cellsNW data", __LINE__);
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsSW, CL_TRUE, 0,
+      ocl.queue, ocl.speedsSW, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSW, 0, NULL, NULL);
   checkError(err, "writing cellsSW data", __LINE__);
 
   err = clEnqueueWriteBuffer(
-      ocl.queue, ocl.speedsSE, CL_TRUE, 0,
+      ocl.queue, ocl.speedsSE, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
 checkError(err, "writing cellsSE data", __LINE__);
 printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) );
@@ -285,49 +285,48 @@ printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) )
     printf("tot density: %.12E\n", total_density(params, cells));
 #endif
   }
-  err = clFinish(ocl.queue);
-  checkError(err, "flushing queue", __LINE__);
+
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.av_vels, CL_TRUE, 0,
+      ocl.queue, ocl.av_vels, CL_FALSE, 0,
       sizeof(cl_float) * params.maxIters, av_vels, 0, NULL, NULL);
   checkError(err, "reading av_vels data", __LINE__);
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speeds0, CL_TRUE, 0,
+      ocl.queue, ocl.speeds0, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speeds0, 0, NULL, NULL);
   checkError(err, "reading cells0 data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsN, CL_TRUE, 0,
+      ocl.queue, ocl.speedsN, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsN, 0, NULL, NULL);
   checkError(err, "reading cellsN data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsS, CL_TRUE, 0,
+      ocl.queue, ocl.speedsS, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsS, 0, NULL, NULL);
   checkError(err, "reading cellsS data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsW, CL_TRUE, 0,
+      ocl.queue, ocl.speedsW, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsW, 0, NULL, NULL);
   checkError(err, "reading cellsW data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsE, CL_TRUE, 0,
+      ocl.queue, ocl.speedsE, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsE, 0, NULL, NULL);
   checkError(err, "reading cellsE data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsNE, CL_TRUE, 0,
+      ocl.queue, ocl.speedsNE, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNE, 0, NULL, NULL);
   checkError(err, "reading cellsNE data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsNW, CL_TRUE, 0,
+      ocl.queue, ocl.speedsNW, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsNW, 0, NULL, NULL);
  checkError(err, "reading cellsNW data", __LINE__);
 
   err = clEnqueueReadBuffer(
-      ocl.queue, ocl.speedsSW, CL_TRUE, 0,
+      ocl.queue, ocl.speedsSW, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSW, 0, NULL, NULL);
   checkError(err, "reading cellsSW data", __LINE__);
 
@@ -336,6 +335,9 @@ printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) )
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
 
   checkError(err, "reading cellsSE data", __LINE__);
+
+  err = clFinish(ocl.queue);
+  checkError(err, "flushing queue", __LINE__);
 
   gettimeofday(&timstr, NULL);
   toc = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
@@ -405,8 +407,8 @@ int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_
 
 float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
     cl_int err;
-    // size_t global[1] = {n};
-
+    size_t global[1] = {n};
+    //
     err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->totu_sums);
     checkError(err, "setting reduce arg 0", __LINE__);
 
@@ -423,11 +425,12 @@ float reduce(int* cell_sums,float* totu_sums,float* av_vels,int tt,int n,t_ocl* 
     err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &tot_cells);
     checkError(err, "setting reduce arg 4", __LINE__);
 
-    err = clEnqueueTask(ocl->queue, ocl->reduce,
-                                 0, NULL, NULL);
-    // err = clEnqueueNDRangeKernel(ocl->queue, ocl->reduce,
-    //                              1, NULL, global, global, 0, NULL, NULL);
-    // checkError(err, "enqueueing reduce kernel", __LINE__);
+    err = clSetKernelArg(ocl->reduce, 5, sizeof(cl_float) * n, NULL);
+    checkError(err, "setting reduce arg 5", __LINE__);
+
+    err = clEnqueueNDRangeKernel(ocl->queue, ocl->reduce,
+                                 1, NULL, global, global, 0, NULL, NULL);
+    checkError(err, "enqueueing reduce kernel", __LINE__);
 
     return 0;
 }

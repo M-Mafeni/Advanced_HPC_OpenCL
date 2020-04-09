@@ -57,6 +57,8 @@
 #include <sys/resource.h>
 #include <omp.h>
 #include "mpi.h"
+#define MASTER 0
+
 
 
 #define NSPEEDS         9
@@ -130,6 +132,7 @@ float calc_reynolds(const t_param params, t_speed_arr* cells, int* obstacles);
 /* utility functions */
 void die(const char* message, const int line, const char* file);
 void usage(const char* exe);
+int calc_ncols_from_rank(int rank, int size,int nx);
 
 /*
 ** main program:
@@ -176,6 +179,8 @@ int main(int argc, char* argv[])
   // if(cells == NULL) printf("error\n" );
   // tmp_cells= (t_speed*)malloc(sizeof(t_speed) * (params.ny * params.nx));
   initialise(paramfile, obstaclefile, &params, &cells_arr, &tmp_cells_arr, &obstacles, &av_vels);
+  int ncols = calc_ncols_from_rank(rank,size,nx); //nx to ignore padding
+
   /* iterate for maxIters timesteps */
   gettimeofday(&timstr, NULL);
   tic = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
@@ -826,4 +831,17 @@ void usage(const char* exe)
 {
   fprintf(stderr, "Usage: %s <paramfile> <obstaclefile>\n", exe);
   exit(EXIT_FAILURE);
+}
+
+int calc_ncols_from_rank(int rank, int size,int nx)
+{
+  int ncols;
+
+  ncols = nx / size;       /* integer division */
+  if ((nx % size) != 0) {  /* if there is a remainder */
+    if (rank == size - 1)
+      ncols += nx % size;  /* add remainder to last rank */
+  }
+
+  return ncols;
 }
