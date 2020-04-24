@@ -67,8 +67,8 @@
 #define FINALSTATEFILE  "final_state.dat"
 #define AVVELSFILE      "av_vels.dat"
 #define OCLFILE         "kernels.cl"
-#define BLOCKSIZE_X      32
-#define BLOCKSIZE_Y     32
+#define BLOCKSIZE_X    128
+#define BLOCKSIZE_Y    8
 
 
 /* struct to hold the parameter values */
@@ -418,7 +418,6 @@ float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot
     err = clSetKernelArg(ocl->reduce, 3, sizeof(cl_int), &n);
     checkError(err, "setting reduce arg 3", __LINE__);
 
-    // printf("%d\n",tot_cells );
     err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &tot_cells);
     checkError(err, "setting reduce arg 4", __LINE__);
 
@@ -681,7 +680,6 @@ int initialise(const char* paramfile, const char* obstaclefile,
   float w0 = params->density * 4.f / 9.f;
   float w1 = params->density      / 9.f;
   float w2 = params->density      / 36.f;
-  printf("w2 = %f\n",w2 );
 
 
 
@@ -857,13 +855,13 @@ checkError(err, "creating cells buffer", __LINE__);
   checkError(err, "creating cells buffer", __LINE__);
 
   ocl->obstacles = clCreateBuffer(
-    ocl->context, CL_MEM_READ_WRITE,
+    ocl->context, CL_MEM_READ_ONLY,
     sizeof(cl_int) * params->nx * params->ny, NULL, &err);
   checkError(err, "creating obstacles buffer", __LINE__);
 
   ocl->totu_sums = clCreateBuffer(
     ocl->context, CL_MEM_WRITE_ONLY,
-    sizeof(cl_float) * (params->nx/BLOCKSIZE_X) * (params->ny/BLOCKSIZE_Y), NULL, &err);
+    sizeof(cl_float) * ((params->nx * params->ny)/(BLOCKSIZE_X*BLOCKSIZE_Y)), NULL, &err);
   checkError(err, "creating totu sums buffer", __LINE__);
 
 

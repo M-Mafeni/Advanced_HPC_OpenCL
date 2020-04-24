@@ -2,23 +2,6 @@
 
 #define NSPEEDS         9
 
-typedef struct
-{
-  float speeds[NSPEEDS];
-} t_speed;
-
-typedef struct{
-  float *speeds0;
-  float *speedsN;
-  float *speedsS;
-  float *speedsW;
-  float *speedsE;
-  float *speedsNW;
-  float *speedsNE;
-  float *speedsSW;
-  float *speedsSE;
-} t_speed_arr;
-
 kernel void accelerate_flow(const global int* obstacles,
                             const int nx, const int ny,
                             const float density, const float accel,

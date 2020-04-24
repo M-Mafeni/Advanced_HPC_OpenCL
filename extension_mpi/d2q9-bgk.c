@@ -57,6 +57,7 @@
 #include <sys/resource.h>
 #include <omp.h>
 #include "mpi.h"
+#include <string.h>
 #define MASTER 0
 
 
@@ -132,7 +133,7 @@ float calc_reynolds(const t_param params, t_speed_arr* cells, int* obstacles);
 /* utility functions */
 void die(const char* message, const int line, const char* file);
 void usage(const char* exe);
-int calc_ncols_from_rank(int rank, int size,int nx);
+int calc_nrows_from_rank(int rank, int size,int nx);
 
 /*
 ** main program:
@@ -175,16 +176,64 @@ int main(int argc, char* argv[])
 
 
   /* initialise our data structures and load values from file */
-  // cells= (t_speed*)malloc(sizeof(t_speed) * (params.ny * params.nx));
-  // if(cells == NULL) printf("error\n" );
-  // tmp_cells= (t_speed*)malloc(sizeof(t_speed) * (params.ny * params.nx));
   initialise(paramfile, obstaclefile, &params, &cells_arr, &tmp_cells_arr, &obstacles, &av_vels);
-  int ncols = calc_ncols_from_rank(rank,size,nx); //nx to ignore padding
+  //split by rows (params.ny)
+  int nrows = calc_nrows_from_rank(rank,size,params.ny); //nx to ignore padding
+  //array to store ncol numbers
+  int *row_numbers = NULL;
+
+  if(rank == MASTER){
+    row_numbers = malloc(sizeof(int) * size);
+  }
+  printf("%d\n",nrows);
+  MPI_Gather(&nrows,1,MPI_INT,row_numbers,1,MPI_INT,MASTER,MPI_COMM_WORLD);
+
+  int loc_rows = nrows + 2; //+2 added for halo regions
+
+  t_speed_arr* loc_cells = malloc(sizeof(t_speed_arr));
+  loc_cells->speeds0 = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsN = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsS = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsW = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsE = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsNW = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsNE = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsSW = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_cells->speedsSE = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+
+  t_speed_arr* loc_tmp_cells = malloc(sizeof(t_speed_arr));
+  loc_tmp_cells->speeds0 = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsN = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsS = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsW = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsE = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsNW = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsNE = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsSW = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  loc_tmp_cells->speedsSE = (float*)_mm_malloc(sizeof(float) * loc_rows * params.nx,64);
+  int* loc_obstacles = malloc(sizeof(int)*loc_rows*params.nx);
+
+  // int *displ = malloc(sizeof(int)*size);
+  // displ[0] = 0;
+  // int displacement = 0;
+  // if(rank == MASTER){
+  //    for(int dest = 1; dest < size; dest++){
+  //      displacement += row_numbers[dest-1];
+  //      displ[dest] = displacement * params.nx;
+  //   }
+  //  }
+
+   //calculate send counts
+    // if(rank == MASTER){
+    //   for(int i = 0; i < size; i++){
+    //       row_numbers[i] = row_numbers[i] * params.ny;
+    //   }
+    // }
 
   /* iterate for maxIters timesteps */
   gettimeofday(&timstr, NULL);
   tic = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
-  for (int tt = 0; tt < params.maxIters; tt++)
+  for (int tt = 0; tt < 0; tt++)
   {
     av_vels[tt] = timestep(params, cells_arr, tmp_cells_arr, obstacles);
 
@@ -209,15 +258,16 @@ int main(int argc, char* argv[])
   systim = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
 
   /* write final values and free memory */
-  printf("==done==\n");
-  printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params, cells_arr, obstacles));
-  printf("Elapsed time:\t\t\t%.6lf (s)\n", toc - tic);
-  printf("Elapsed user CPU time:\t\t%.6lf (s)\n", usrtim);
-  printf("Elapsed system CPU time:\t%.6lf (s)\n", systim);
+  if(rank==MASTER){
+      printf("==done==\n");
+      printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params, cells_arr, obstacles));
+      printf("Elapsed time:\t\t\t%.6lf (s)\n", toc - tic);
+      printf("Elapsed user CPU time:\t\t%.6lf (s)\n", usrtim);
+      printf("Elapsed system CPU time:\t%.6lf (s)\n", systim);
 
-  write_values(params, cells_arr, obstacles, av_vels);
-  finalise(&params, &obstacles, &av_vels);
-
+      write_values(params, cells_arr, obstacles, av_vels);
+      finalise(&params, &obstacles, &av_vels);
+  }
   return EXIT_SUCCESS;
 }
 
@@ -833,7 +883,7 @@ void usage(const char* exe)
   exit(EXIT_FAILURE);
 }
 
-int calc_ncols_from_rank(int rank, int size,int nx)
+int calc_nrows_from_rank(int rank, int size,int nx)
 {
   int ncols;
 

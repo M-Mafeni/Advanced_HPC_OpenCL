@@ -15,7 +15,7 @@ endif
 
 FINAL_STATE_FILE=./final_state.dat
 AV_VELS_FILE=./av_vels.dat
-REF_FINAL_STATE_FILE=check/128x128.final_state.dat
+REF_FINAL_STATE_FILE=check/init_state_128.dat
 REF_AV_VELS_FILE=check/128x128.av_vels.dat
 
 all: $(EXE)
