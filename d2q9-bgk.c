@@ -67,7 +67,7 @@
 #define FINALSTATEFILE  "final_state.dat"
 #define AVVELSFILE      "av_vels.dat"
 #define OCLFILE         "kernels.cl"
-#define BLOCKSIZE_X    128
+#define BLOCKSIZE_X    16
 #define BLOCKSIZE_Y    8
 
 
@@ -94,7 +94,6 @@ typedef struct
   cl_kernel  accelerate_flow;
   cl_kernel collision;
   cl_kernel av_velocity;
-  cl_kernel reduce;
    cl_kernel fin_reduce;
 
   cl_mem obstacles;
@@ -108,7 +107,6 @@ typedef struct
   cl_mem speedsSW;
   cl_mem speedsSE;
 
-  cl_mem totu_sums;
   cl_mem av_vels;
   cl_mem all_totu;
 } t_ocl;
@@ -147,7 +145,6 @@ int initialise(const char* paramfile, const char* obstaclefile,
 */
 float timestep(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl ocl, int tt);
 int accelerate_flow(const t_param params, t_speed_arr* cells, int* obstacles, t_ocl* ocl);
-float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells);
 int fin_reduce(int tot_cells,t_ocl* ocl,const t_param params,int n);
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl,int tt);
 int write_values(const t_param params, t_speed_arr* cells, int* obstacles, float* av_vels);
@@ -278,14 +275,12 @@ printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) )
   {
 
     timestep(params, cells, tmp_cells, obstacles, ocl,tt);
-    // reduce(av_vels,tt,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y),&ocl,params,tot_cells);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
     printf("tot density: %.12E\n", total_density(params, cells));
 #endif
   }
-  // fin_reduce();
  fin_reduce(tot_cells,&ocl,params,(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y));
 
   err = clEnqueueReadBuffer(
@@ -430,36 +425,6 @@ int fin_reduce(int tot_cells,t_ocl* ocl,const t_param params,int n){
     checkError(err, "enqueueing fin_reduce kernel", __LINE__);
     return 0;
 }
-float reduce(float* av_vels,int tt,int n,t_ocl* ocl,const t_param params,int tot_cells){
-    cl_int err;
-    // size_t global[1] = {n};
-
-    err = clSetKernelArg(ocl->reduce, 0, sizeof(cl_mem), &ocl->totu_sums);
-    checkError(err, "setting reduce arg 0", __LINE__);
-
-    err = clSetKernelArg(ocl->reduce, 1, sizeof(cl_mem), &ocl->av_vels);
-    checkError(err, "setting reduce arg 1", __LINE__);
-
-    err = clSetKernelArg(ocl->reduce, 2, sizeof(cl_int), &tt);
-    checkError(err, "setting reduce arg 2", __LINE__);
-
-    err = clSetKernelArg(ocl->reduce, 3, sizeof(cl_int), &n);
-    checkError(err, "setting reduce arg 3", __LINE__);
-
-    err = clSetKernelArg(ocl->reduce, 4, sizeof(cl_int), &tot_cells);
-    checkError(err, "setting reduce arg 4", __LINE__);
-
-    // err = clSetKernelArg(ocl->reduce, 5, sizeof(cl_float) * n, NULL);
-    // checkError(err, "setting reduce arg 5", __LINE__);
-
-    // err = clEnqueueNDRangeKernel(ocl->queue, ocl->reduce,
-    //                              1, NULL, global, global, 0, NULL, NULL);
-    err = clEnqueueTask(ocl->queue, ocl->reduce,
-                                 0, NULL, NULL);
-    checkError(err, "enqueueing reduce kernel", __LINE__);
-
-    return 0;
-}
 
 float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells, int* obstacles, t_ocl* ocl, int tt)
 {
@@ -497,23 +462,23 @@ float collision(const t_param params, t_speed_arr* cells, t_speed_arr* tmp_cells
     err = clSetKernelArg(ocl->collision, 12, sizeof(cl_float) * local[0] * local[1] , NULL);
     checkError(err, "setting collision arg 12", __LINE__);
 
-    err = clSetKernelArg(ocl->collision, 13, sizeof(cl_mem) , &ocl->totu_sums);
+    // err = clSetKernelArg(ocl->collision, 13, sizeof(cl_mem) , &ocl->totu_sums);
+    // checkError(err, "setting collision arg 13", __LINE__);
+
+    err = clSetKernelArg(ocl->collision, 13, sizeof(cl_int) , &local[0]);
     checkError(err, "setting collision arg 13", __LINE__);
 
-    err = clSetKernelArg(ocl->collision, 14, sizeof(cl_int) , &local[0]);
+    err = clSetKernelArg(ocl->collision, 14, sizeof(cl_int) , &params.ny);
     checkError(err, "setting collision arg 14", __LINE__);
 
-    err = clSetKernelArg(ocl->collision, 15, sizeof(cl_int) , &params.ny);
+    err = clSetKernelArg(ocl->collision, 15, sizeof(cl_mem) , &ocl->all_totu);
     checkError(err, "setting collision arg 15", __LINE__);
 
-    err = clSetKernelArg(ocl->collision, 16, sizeof(cl_mem) , &ocl->all_totu);
+    err = clSetKernelArg(ocl->collision, 16, sizeof(cl_int) , &tt);
     checkError(err, "setting collision arg 16", __LINE__);
 
-    err = clSetKernelArg(ocl->collision, 17, sizeof(cl_int) , &tt);
+    err = clSetKernelArg(ocl->collision, 17, sizeof(cl_int) , &params.maxIters);
     checkError(err, "setting collision arg 17", __LINE__);
-
-    err = clSetKernelArg(ocl->collision, 18, sizeof(cl_int) , &params.maxIters);
-    checkError(err, "setting collision arg 18", __LINE__);
 
     err = clEnqueueNDRangeKernel(ocl->queue, ocl->collision,
                                  2, NULL, global, local, 0, NULL, NULL);
@@ -843,8 +808,6 @@ int initialise(const char* paramfile, const char* obstaclefile,
   checkError(err, "creating collision kernel", __LINE__);
   ocl->av_velocity = clCreateKernel(ocl->program,"av_velocity",&err);
   checkError(err, "creating av_velocity kernel", __LINE__);
-  ocl->reduce = clCreateKernel(ocl->program,"reduce",&err);
-  checkError(err, "creating reduce kernel", __LINE__);
   ocl->fin_reduce = clCreateKernel(ocl->program,"fin_reduce",&err);
   checkError(err, "creating fin_reduce kernel", __LINE__);
 
@@ -900,11 +863,6 @@ checkError(err, "creating cells buffer", __LINE__);
     sizeof(cl_int) * params->nx * params->ny, NULL, &err);
   checkError(err, "creating obstacles buffer", __LINE__);
   int group_size = ((params->nx * params->ny)/(BLOCKSIZE_X*BLOCKSIZE_Y));
-  ocl->totu_sums = clCreateBuffer(
-    ocl->context, CL_MEM_WRITE_ONLY,
-    sizeof(cl_float) * group_size , NULL, &err);
-  checkError(err, "creating totu sums buffer", __LINE__);
-
 
  ocl->av_vels = clCreateBuffer(
    ocl->context, CL_MEM_WRITE_ONLY,

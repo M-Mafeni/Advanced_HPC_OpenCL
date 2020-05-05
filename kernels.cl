@@ -43,40 +43,12 @@ speedsSW[index] -= w2;
 
 }
 
-// kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,int tot_cells,local float* local_totu_sums){
-//
-//     int local_id = get_local_id(0);
-//     int global_id = get_global_id(0);
-//
-//     local_totu_sums[local_id] = totu_sums[global_id];
-//
-//     for(int offset =  1; offset < N; offset*= 2)
-//     {
-//         int mask = 2*offset -1;
-//         barrier(CLK_LOCAL_MEM_FENCE);
-//         int x = (local_id&mask);
-//         float b = (x==0)?local_totu_sums[local_id+ offset] : 0.f;
-//         local_totu_sums[local_id] += b;
-//     }
-//     barrier(CLK_LOCAL_MEM_FENCE);
-//     if(local_id == 0){
-//         av_vels[tt] = local_totu_sums[0]/(float)tot_cells;
-//     }
-// }
 kernel void fin_reduce(global float* all_totu,global float* av_vels,int tot_cells,int n,int maxIters){
     int tt = get_global_id(0);
     float tot_u = 0;
     for(int i = 0; i < n; i++)
     {
         tot_u += all_totu[tt+i*maxIters];
-    }
-    av_vels[tt] = tot_u/(float)tot_cells;
-}
-kernel void reduce(global float* totu_sums, global float* av_vels,int tt,int N,int tot_cells){
-    float tot_u = 0.0f;
-    for(int i = 0; i < N; i++)
-    {
-        tot_u += totu_sums[i];
     }
     av_vels[tt] = tot_u/(float)tot_cells;
 }
@@ -92,7 +64,6 @@ kernel void collision( global float* speeds0,
                       const global int* obstacles,
                       const int nx, const float omega,
                       local float* local_totu_sums,
-                      global float* global_totu_sums,
                       const int blksize,const int ny,
                       global float* all_totu,
                       int tt,
