@@ -269,7 +269,6 @@ int main(int argc, char* argv[])
       ocl.queue, ocl.speedsSE, CL_FALSE, 0,
       sizeof(cl_float) * params.nx * params.ny, cells->speedsSE, 0, NULL, NULL);
 checkError(err, "writing cellsSE data", __LINE__);
-printf("no of groups = %d\n",(params.nx/BLOCKSIZE_X) * (params.ny/BLOCKSIZE_Y) );
 
   for (int tt = 0; tt < params.maxIters; tt++)
   {
@@ -660,20 +659,6 @@ int initialise(const char* paramfile, const char* obstaclefile,
   (*cells_ptr)->speedsSE = (float*)malloc(sizeof(float) * params->ny * params->nx);
   //
 
-  //
-  // /* 'helper' grid, used as scratch space */
-  *tmp_cells_ptr = (t_speed_arr*)malloc(sizeof(t_speed_arr));
-  if (*tmp_cells_ptr == NULL) die("cannot allocate memory for tmp_cells", __LINE__, __FILE__);
-  (*tmp_cells_ptr)->speeds0 = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsN = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsS = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsW = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsE = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsNW = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsNE = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsSW = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  (*tmp_cells_ptr)->speedsSE = (float*)malloc(sizeof(float) * params->ny * params->nx);
-  //
 
   /* the map of obstacles */
   *obstacles_ptr = (int*) malloc(sizeof(int) * (params->ny * params->nx));

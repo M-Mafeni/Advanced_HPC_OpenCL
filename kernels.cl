@@ -210,7 +210,7 @@ kernel void collision( global float* speeds0,
         float b = (x==0)?local_totu_sums[local_id+ offset] : 0.f;
         local_totu_sums[local_id] += b;
     }
-    // barrier(CLK_LOCAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE);
     if(local_id == 0)
     {
         // global_totu_sums[group_id] = local_totu_sums[0];
